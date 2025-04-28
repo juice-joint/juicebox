@@ -1,0 +1,6 @@
+/target
+assets/
+crates/binary-sidecar/target
+crates/binary-sidecar/ffmpeg
+crates/binary-sidecar/yt-dlp*
+node_modules
