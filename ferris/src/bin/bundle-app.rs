@@ -20,7 +20,7 @@ fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
 
     let package_types = vec![
         PackageType::from_short_name("deb").unwrap(),
-        PackageType::from_short_name("dmg")
+        PackageType::from_short_name("dmg").unwrap()
     ];
 
     let bundle_settings = BundleSettings {
