@@ -15,11 +15,12 @@ fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
         description: "loool".to_string(),
         homepage: None,
         authors: Some(vec!["jpiece".to_string(), "bigbitchtrev".to_string()]),
-        default_run: None // Add default_run to specify the main binary
+        default_run: Some("juicebox".to_string()) // Add default_run to specify the main binary
     };
 
     let package_types = vec![
-        PackageType::from_short_name("deb").unwrap()
+        PackageType::from_short_name("deb").unwrap(),
+        PackageType::from_short_name("dmg")
     ];
 
     let bundle_settings = BundleSettings {

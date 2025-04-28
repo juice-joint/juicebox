@@ -75,7 +75,7 @@ impl ReleaseFetcher for YtdlpFetcher {
                     (Platform::Linux, Architecture::Aarch64) => {
                         name.contains(&format!("{}_linux_aarch64", YTDLP_ASSET_NAME))
                     }
-                    (Platform::Mac, _) => name.contains(&format!("{}_macos", YTDLP_ASSET_NAME)),
+                    (Platform::Mac, _) => name.contains(&format!("{}_macos_legacy", YTDLP_ASSET_NAME)),
                     _ => false,
                 }
             })
