@@ -1,6 +1,6 @@
-use std::path::{Path, PathBuf};
+use std::{path::{Path, PathBuf}, process::{Command, Output}};
 
-use deps::{FetcherError, ReleaseFetcher};
+use deps::{FetcherError, Release, ReleaseFetcher};
 use thiserror::Error;
 use tracing::debug;
 use utils::{architecture::Architecture, platform::Platform};
@@ -36,14 +36,68 @@ pub enum ExtractError {
     FetchError(#[from] FetcherError),
 }
 
+#[derive(Error, Debug)]
+pub enum ExecutionError {
+    #[error("Failed to execute binary: {0}")]
+    IoError(#[from] std::io::Error),
+    
+    #[error("Binary execution failed with exit code: {0}")]
+    NonZeroExit(i32),
+    
+    #[error("Binary execution terminated by signal")]
+    TerminatedBySignal,
+}
+
+#[derive(Debug, Clone)]
+pub struct Binary {
+    /// Path to the binary executable
+    path: PathBuf,
+}
+
+impl Binary {
+    /// Create a new Binary instance
+    pub fn new(path: PathBuf) -> Self {
+        Self { path }
+    }
+    
+    /// Get the path to the binary
+    pub fn path(&self) -> &Path {
+        &self.path
+    }
+    
+    /// Execute the binary with the given arguments
+    pub fn execute(&self, args: &[&str]) -> Result<Output, ExecutionError> {
+        debug!("Executing binary at {:?} with args: {:?}", self.path, args);
+        
+        let output = Command::new(&self.path)
+            .args(args)
+            .output()?;
+            
+        if !output.status.success() {
+            match output.status.code() {
+                Some(code) => return Err(ExecutionError::NonZeroExit(code)),
+                None => return Err(ExecutionError::TerminatedBySignal),
+            }
+        }
+        
+        Ok(output)
+    }
+}
+
 pub async fn download_and_extract_binary(
-    release_fetcher: &impl ReleaseFetcher,
-    destination_dir: impl AsRef<Path>,
-    platform: &Platform,
-    architecture: &Architecture
+    release: Release,
+    destination_dir: impl AsRef<Path>
+) -> Result<Binary, ExtractError> {
+    let binary_path = download_and_extract_binary_path(release, destination_dir).await?;
+    Ok(Binary::new(binary_path))
+}
+
+pub async fn download_and_extract_binary_path(
+    release: Release,
+    destination_dir: impl AsRef<Path>
 ) -> Result<PathBuf, ExtractError> {
-    let release = release_fetcher.get_release(platform, architecture).await
-        .map_err(|err| ExtractError::FetchError(err))?;
+    // let release = release_fetcher.get_release(platform, architecture).await
+    //     .map_err(|err| ExtractError::FetchError(err))?;
     
     let destination_dir = destination_dir.as_ref();
     tokio::fs::create_dir_all(destination_dir).await?;

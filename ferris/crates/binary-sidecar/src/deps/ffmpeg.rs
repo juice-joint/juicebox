@@ -1,3 +1,7 @@
+use std::process::Command;
+
+use which::which;
+
 use crate::utils::{architecture::Architecture, platform::Platform};
 
 use super::{FetcherError, Release, ReleaseFetcher};
@@ -9,11 +13,13 @@ const MACOS_ARM_FFMPEG_URL: &'static str = "https://www.osxexperts.net/ffmpeg71a
 const LINUX_FFMPEG_URL_TEMPLATE: &'static str =
     "https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-{}-static.tar.xz";
 
-pub struct FfmpegFetcher {}
+pub struct FfmpegFetcher {
+    binary_name: String
+}
 
 impl FfmpegFetcher {
-    pub fn new() -> FfmpegFetcher {
-        FfmpegFetcher {}
+    pub fn new(binary_name: String) -> Self {
+        Self { binary_name }
     }
 }
 
@@ -49,7 +55,7 @@ impl ReleaseFetcher for FfmpegFetcher {
 
         Ok(Release {
             url,
-            binary_name: String::from("ffmpeg"),
+            binary_name: self.binary_name.clone(),
         })
     }
 }

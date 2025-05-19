@@ -24,7 +24,7 @@ impl WindowEventHandle {
     }
 
     pub fn load_url(&self, url: String) {
-        self.event_proxy.send_event(AppEvent::LoadUrl(url));
+        let _ = self.event_proxy.send_event(AppEvent::LoadUrl(url));
     }
 }
 

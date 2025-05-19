@@ -1,7 +1,5 @@
 use binary_sidecar::{
-    deps::{ffmpeg::FfmpegFetcher, ytdlp::YtdlpFetcher},
-    download_and_extract_binary,
-    utils::{architecture::Architecture, platform::Platform},
+    deps::{ffmpeg::FfmpegFetcher, ytdlp::YtdlpFetcher, ReleaseFetcher}, download_and_extract_binary, download_and_extract_binary_path, utils::{architecture::Architecture, platform::Platform}
 };
 use desktop::{webview, window::{AppEvent, WindowEventHandle}};
 use server::globals::{self, init_config_dir, set_binary_path};
@@ -40,12 +38,10 @@ async fn main() {
         tracing::info!("Starting binary initialization");
 
         // Download and extract ffmpeg
-        let ffmpeg_fetcher = FfmpegFetcher::new();
-        let ffmpeg_path = match download_and_extract_binary(
-            &ffmpeg_fetcher,
+        let ffmpeg_fetcher = FfmpegFetcher::new("ffmpeg".to_string());
+        let ffmpeg_path = match download_and_extract_binary_path(
+            ffmpeg_fetcher.get_release(&platform, &architecture).await.unwrap(),
             &config_dir,
-            &platform,
-            &architecture,
         )
         .await
         {
@@ -62,11 +58,9 @@ async fn main() {
 
         // Download and extract yt-dlp
         let ytdlp_fetcher = YtdlpFetcher::new();
-        let ytdlp_path = match download_and_extract_binary(
-            &ytdlp_fetcher,
+        let ytdlp_path = match download_and_extract_binary_path(
+            ytdlp_fetcher.get_release(&platform, &architecture).await.unwrap(),
             &config_dir,
-            &platform,
-            &architecture,
         )
         .await
         {
@@ -83,6 +77,7 @@ async fn main() {
 
         tracing::info!("Binary initialization complete, redirecting to /goldie");
         window_event_handle.clone().load_url("http://localhost:8000/goldie".to_string());
+        init_config_dir(config_dir);
     });
 
     match desktop::window::create_desktop_webview("http://localhost:8000/", event_loop) {

@@ -3,20 +3,13 @@ use reqwest::header::{HeaderMap, HeaderValue, USER_AGENT};
 use serde::Deserialize;
 use serde_json::Value;
 use thiserror::Error;
+use which::which;
 
 use crate::utils::{architecture::Architecture, platform::Platform};
 
 use super::{FetcherError, Release, ReleaseFetcher};
 
 const YTDLP_ASSET_NAME: &'static str = "yt-dlp";
-
-pub struct YtdlpFetcher {}
-
-impl YtdlpFetcher {
-    pub fn new() -> YtdlpFetcher {
-        YtdlpFetcher {}
-    }
-}
 
 #[derive(Debug, Deserialize, Display)]
 #[display("Release: tag={}, assets={};", tag_name, assets.len())]
@@ -31,6 +24,14 @@ pub struct GithubAsset {
     pub name: String,
     #[serde(rename = "browser_download_url")]
     pub download_url: String,
+}
+
+pub struct YtdlpFetcher {}
+
+impl YtdlpFetcher {
+    pub fn new() -> YtdlpFetcher {
+        YtdlpFetcher {}
+    }
 }
 
 impl ReleaseFetcher for YtdlpFetcher {
@@ -75,7 +76,7 @@ impl ReleaseFetcher for YtdlpFetcher {
                     (Platform::Linux, Architecture::Aarch64) => {
                         name.contains(&format!("{}_linux_aarch64", YTDLP_ASSET_NAME))
                     }
-                    (Platform::Mac, _) => name.contains(&format!("{}_macos_legacy", YTDLP_ASSET_NAME)),
+                    (Platform::Mac, _) => name.contains(&format!("{}*macos", YTDLP_ASSET_NAME)),
                     _ => false,
                 }
             })
