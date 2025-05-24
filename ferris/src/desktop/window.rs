@@ -79,7 +79,6 @@ pub fn create_desktop_webview(
             }
             Event::UserEvent(app_event) => match app_event {
                 AppEvent::LoadUrl(url) => {
-                    println!("laoding url");
                     let test = webview.load_url(&url);
                 }
                 AppEvent::Exit => {}

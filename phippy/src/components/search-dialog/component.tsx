@@ -28,21 +28,10 @@ export const SearchDialog = ({
 
   if (!isOpen) return null;
 
-  function SearchSkeleton() {
+  function Spinner() {
     return (
-      <div className="animate-pulse space-y-4 w-full">
-        {[...Array(4)].map((_, i) => (
-          <div
-            key={i}
-            className="p-4 bg-gray-800/50 backdrop-blur-sm rounded-xl flex gap-4 items-center"
-          >
-            <div className="bg-white/10 rounded-lg w-20 h-20" />
-            <div className="space-y-2 flex-1">
-              <div className="bg-white/10 rounded h-4 w-3/4" />
-              <div className="bg-white/10 rounded h-4 w-1/2" />
-            </div>
-          </div>
-        ))}
+      <div className="flex justify-center items-center py-8">
+        <div className="animate-spin rounded-full h-12 w-12 border-2 border-purple-500 border-t-transparent"></div>
       </div>
     );
   }
@@ -114,7 +103,7 @@ export const SearchDialog = ({
           </div>
 
           <div className="max-h-[60vh] overflow-y-auto">
-            {isPending && debouncedQuery && <SearchSkeleton />}
+            {isPending && debouncedQuery && <Spinner />}
 
             {isError && (
               <div className="flex justify-center items-center py-8 text-red-400">

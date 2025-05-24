@@ -10,6 +10,9 @@ use tokio::sync::oneshot;
 mod desktop;
 mod server;
 
+const DOWNLOAD_FFMPEG: bool = true;
+const DOWNLOAD_YTDLP: bool = true;
+
 #[tokio::main]
 async fn main() {
     tracing_subscriber::fmt::init();
@@ -37,50 +40,52 @@ async fn main() {
     tokio::spawn(async move {
         tracing::info!("Starting binary initialization");
 
-        // Download and extract ffmpeg
-        let ffmpeg_fetcher = FfmpegFetcher::new("ffmpeg".to_string());
-        let ffmpeg_path = match download_and_extract_binary_path(
-            ffmpeg_fetcher.get_release(&platform, &architecture).await.unwrap(),
-            &config_dir,
-        )
-        .await
-        {
-            Ok(path) => {
-                println!("FFmpeg initialized: {:?}", path);
-                path
-            }
-            Err(e) => {
-                tracing::error!("Failed to initialize FFmpeg: {}", e);
-                return;
-            }
-        };
-        set_binary_path("ffmpeg", ffmpeg_path);
+        if (DOWNLOAD_FFMPEG) {
+            let ffmpeg_fetcher = FfmpegFetcher::new("ffmpeg".to_string());
+            let ffmpeg_path = match download_and_extract_binary_path(
+                ffmpeg_fetcher.get_release(&platform, &architecture).await.unwrap(),
+                &config_dir,
+            )
+            .await
+            {
+                Ok(path) => {
+                    println!("FFmpeg initialized: {:?}", path);
+                    path
+                }
+                Err(e) => {
+                    tracing::error!("Failed to initialize FFmpeg: {}", e);
+                    return;
+                }
+            };
+            set_binary_path("ffmpeg", ffmpeg_path);
+        }
 
-        // Download and extract yt-dlp
-        let ytdlp_fetcher = YtdlpFetcher::new();
-        let ytdlp_path = match download_and_extract_binary_path(
-            ytdlp_fetcher.get_release(&platform, &architecture).await.unwrap(),
-            &config_dir,
-        )
-        .await
-        {
-            Ok(path) => {
-                println!("yt-dlp initialized: {:?}", path);
-                path
-            }
-            Err(e) => {
-                tracing::error!("Failed to initialize yt-dlp: {}", e);
-                return;
-            }
-        };
-        set_binary_path("yt-dlp", ytdlp_path);
+        if (DOWNLOAD_YTDLP) { 
+            let ytdlp_fetcher = YtdlpFetcher::new();
+            let ytdlp_path = match download_and_extract_binary_path(
+                ytdlp_fetcher.get_release(&platform, &architecture).await.unwrap(),
+                &config_dir,
+            )
+            .await
+            {
+                Ok(path) => {
+                    println!("yt-dlp initialized: {:?}", path);
+                    path
+                }
+                Err(e) => {
+                    tracing::error!("Failed to initialize yt-dlp: {}", e);
+                    return;
+                }
+            };
+            set_binary_path("yt-dlp", ytdlp_path);
+        }
 
         tracing::info!("Binary initialization complete, redirecting to /goldie");
         window_event_handle.clone().load_url("http://localhost:8000/goldie".to_string());
         init_config_dir(config_dir);
     });
 
-    match desktop::window::create_desktop_webview("http://localhost:8000/", event_loop) {
+    match desktop::window::create_desktop_webview("http://localhost:8000/goldie/", event_loop) {
         Ok(_) => tracing::info!("Desktop app closed successfully"),
         Err(e) => tracing::error!("Desktop app error: {}", e),
     }

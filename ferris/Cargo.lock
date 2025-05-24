@@ -3498,6 +3498,7 @@ dependencies = [
  "tracing-subscriber",
  "unidecode",
  "uuid",
+ "which",
  "wry",
 ]
 
