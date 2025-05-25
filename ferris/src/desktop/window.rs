@@ -1,6 +1,8 @@
 use serde::ser::Error;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+use std::thread;
+use std::time::Duration;
 use tao::{
     event::{Event, WindowEvent},
     event_loop::{ControlFlow, EventLoop, EventLoopBuilder, EventLoopProxy},
@@ -10,6 +12,8 @@ use wry::WebViewBuilder;
 
 pub enum AppEvent {
     LoadUrl(String),
+    Hide,
+    Show,
     Exit,
 }
 
@@ -25,6 +29,14 @@ impl WindowEventHandle {
 
     pub fn load_url(&self, url: String) {
         let _ = self.event_proxy.send_event(AppEvent::LoadUrl(url));
+    }
+
+    pub fn hide_window(&self) {
+        let _ = self.event_proxy.send_event(AppEvent::Hide);
+    }
+
+    pub fn show_window(&self) {
+        let _ = self.event_proxy.send_event(AppEvent::Show);
     }
 }
 
@@ -79,8 +91,16 @@ pub fn create_desktop_webview(
             }
             Event::UserEvent(app_event) => match app_event {
                 AppEvent::LoadUrl(url) => {
+                    println!("LOADING URL");
                     let test = webview.load_url(&url);
+                },
+                AppEvent::Hide => {
+                    println!("hiding!");
+                    window.set_visible(false);
                 }
+                AppEvent::Show => {
+                    window.set_visible(true);
+                },
                 AppEvent::Exit => {}
             },
             _ => (),

@@ -4,7 +4,7 @@ use binary_sidecar::{
 use desktop::{webview, window::{AppEvent, WindowEventHandle}};
 use server::globals::{self, init_config_dir, set_binary_path};
 use tao::{event::{Event, WindowEvent}, event_loop::{ControlFlow, EventLoopBuilder}};
-use std::{net::SocketAddr, path::PathBuf, sync::{atomic::Ordering, Arc}};
+use std::{net::SocketAddr, path::PathBuf, sync::{atomic::Ordering, Arc}, thread, time::Duration};
 use tokio::sync::oneshot;
 
 mod desktop;
@@ -35,6 +35,7 @@ async fn main() {
     let event_loop = EventLoopBuilder::<AppEvent>::with_user_event().build();
     let event_loop_proxy = event_loop.create_proxy();
     let window_event_handle = WindowEventHandle::new(event_loop_proxy);
+    let window_event_handle_clone = window_event_handle.clone();
 
     let config_dir = PathBuf::from("./config");
     tokio::spawn(async move {
@@ -81,14 +82,22 @@ async fn main() {
         }
 
         tracing::info!("Binary initialization complete, redirecting to /goldie");
-        window_event_handle.clone().load_url("http://localhost:8000/goldie".to_string());
+        window_event_handle_clone.load_url("http://localhost:8000/goldie".to_string());
+
+
+        window_event_handle_clone.hide_window();
+        thread::sleep(Duration::from_millis(1000));
+        window_event_handle_clone.show_window();
+
+
         init_config_dir(config_dir);
     });
 
-    match desktop::window::create_desktop_webview("http://localhost:8000/goldie/", event_loop) {
+    match desktop::window::create_desktop_webview("http://localhost:8000/", event_loop) {
         Ok(_) => tracing::info!("Desktop app closed successfully"),
         Err(e) => tracing::error!("Desktop app error: {}", e),
     }
+
 
     let _ = server_handle.abort();
     tracing::info!("Application shutting down");
