@@ -1,12 +1,10 @@
-use std::{collections::HashMap, path::{Path, PathBuf}};
-use serde::{Deserialize, Serialize};
+use std::{collections::HashMap, path::PathBuf};
 use tauri_bundler::{
     bundle_project, AppImageSettings, BundleBinary, BundleSettings, DebianSettings, DmgSettings, 
-    IosSettings, MacOsSettings, PackageSettings, PackageType, Position, RpmSettings, Settings, 
+    IosSettings, MacOsSettings, PackageSettings, PackageType, Position, RpmSettings, 
     SettingsBuilder, Size, WindowsSettings, AppCategory
 };
-use tauri_utils::{config::WebviewInstallMode, platform::Target};
-use tracing::Level;
+use tauri_utils::config::WebviewInstallMode;
 
 fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
     let package_settings = PackageSettings {

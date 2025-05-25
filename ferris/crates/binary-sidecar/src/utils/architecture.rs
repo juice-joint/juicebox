@@ -26,11 +26,9 @@ pub enum Architecture {
 
 impl Architecture {
     /// Detects the current architecture of the CPU where the program is running.
-    #[cfg_attr(feature = "tracing", tracing::instrument(level = "debug"))]
     pub fn detect() -> Self {
         let arch = std::env::consts::ARCH;
 
-        #[cfg(feature = "tracing")]
         tracing::debug!("Detected architecture: {}", arch);
 
         match arch {

@@ -3,7 +3,6 @@ use reqwest::header::{HeaderMap, HeaderValue, USER_AGENT};
 use serde::Deserialize;
 use serde_json::Value;
 use thiserror::Error;
-use which::which;
 
 use crate::utils::{architecture::Architecture, platform::Platform};
 
@@ -107,8 +106,7 @@ pub enum ApiError {
 }
 
 pub async fn fetch_json(url: &str, auth_token: Option<String>) -> Result<Value, ApiError> {
-    #[cfg(feature = "tracing")]
-    tracing::debug!("Fetching JSON from {}", self.url);
+    tracing::debug!("Fetching JSON from {}", url);
 
     let mut headers = HeaderMap::new();
     headers.insert(USER_AGENT, HeaderValue::from_static("rust-reqwest"));

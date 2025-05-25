@@ -1,7 +1,3 @@
-use std::process::Command;
-
-use which::which;
-
 use crate::utils::{architecture::Architecture, platform::Platform};
 
 use super::{FetcherError, Release, ReleaseFetcher};

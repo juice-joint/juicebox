@@ -3,7 +3,6 @@ name = "juicebox"
 version = "0.1.0"
 edition = "2021"
 default-run = "juicebox"
-build = "build.rs"
 
 [[bin]]
 name = "bundle-app"

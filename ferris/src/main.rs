@@ -3,7 +3,7 @@ use binary_sidecar::{
 };
 use desktop::{webview, window::{AppEvent, WindowEventHandle}};
 use server::globals::{self, init_config_dir, set_binary_path};
-use tao::{event::{Event, WindowEvent}, event_loop::{ControlFlow, EventLoopBuilder}};
+use tao::event_loop::EventLoopBuilder;
 use std::{net::SocketAddr, path::PathBuf, sync::{atomic::Ordering, Arc}, thread, time::Duration};
 use tokio::sync::oneshot;
 

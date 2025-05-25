@@ -1,9 +1,6 @@
 use core::fmt;
-use std::path::{Path, PathBuf};
 
 use thiserror::Error;
-use tracing::debug;
-use zip::result::ZipError;
 
 use crate::utils::{architecture::Architecture, platform::Platform};
 
@@ -46,6 +43,7 @@ pub enum FetcherError {
     Other(String),
 }
 
+#[allow(async_fn_in_trait)]
 pub trait ReleaseFetcher {
     async fn get_release(
         &self,

@@ -1,9 +1,8 @@
 use std::{path::{Path, PathBuf}, process::{Command, Output}};
 
-use deps::{FetcherError, Release, ReleaseFetcher};
+use deps::{FetcherError, Release};
 use thiserror::Error;
 use tracing::debug;
-use utils::{architecture::Architecture, platform::Platform};
 use zip::result::ZipError;
 
 pub mod deps;

@@ -23,11 +23,9 @@ pub enum Platform {
 
 impl Platform {
     /// Detects the current platform where the program is running.
-    #[cfg_attr(feature = "tracing", tracing::instrument(level = "debug"))]
     pub fn detect() -> Self {
         let os = std::env::consts::OS;
 
-        #[cfg(feature = "tracing")]
         tracing::debug!("Detected platform: {}", os);
 
         match os {
