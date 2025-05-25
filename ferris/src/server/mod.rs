@@ -12,7 +12,9 @@ use tokio::sync::{self, oneshot};
 
 use actors::video_downloader::VideoDlActorHandle;
 use actors::video_searcher::VideoSearcherActorHandle;
-use routes::admin::{get_key, key_down, key_up, remove_song, reposition_song, restart_song, toggle_playback};
+use routes::admin::{
+    get_key, key_down, key_up, remove_song, reposition_song, restart_song, toggle_playback,
+};
 use routes::karaoke::{current_song, play_next_song, queue_song, search, song_list};
 use routes::sse::sse;
 use routes::streaming::serve_dash_file;
@@ -23,14 +25,14 @@ use tracing::{error, info};
 use utils::yt_downloader::YtDownloader;
 use utils::yt_searcher::YtSearcher;
 
-use rust_embed::RustEmbed;
 use axum_embed::ServeEmbed;
+use rust_embed::RustEmbed;
 
 pub mod actors;
-pub mod routes;
-pub mod utils;
-mod state;
 pub mod globals;
+pub mod routes;
+mod state;
+pub mod utils;
 
 // Include the built React apps using rust-embed
 #[derive(RustEmbed, Clone)]
@@ -91,18 +93,12 @@ pub async fn run_server(addr: SocketAddr, ready_tx: oneshot::Sender<()>) {
         .allow_headers(Any);
 
     // Build our application with routes
-    let app = Router::new() 
+    let app = Router::new()
         .merge(api_router)
         // Use ServeEmbed for Goldie assets
-        .nest_service(
-            "/goldie", 
-            ServeEmbed::<GoldieAssets>::new()
-        )
+        .nest_service("/goldie", ServeEmbed::<GoldieAssets>::new())
         // Use ServeEmbed for Phippy assets
-        .nest_service(
-            "/phippy", 
-            ServeEmbed::<PhippyAssets>::new()
-        )
+        .nest_service("/phippy", ServeEmbed::<PhippyAssets>::new())
         .layer(cors_layer)
         .layer(TraceLayer::new_for_http());
 

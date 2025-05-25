@@ -5,14 +5,18 @@ use tracing::debug;
 
 #[derive(Serialize)]
 struct ServerIpResponse {
-    ip: String
+    ip: String,
 }
 
-pub async fn server_ip(
-) -> Result<impl IntoResponse, StatusCode> {
+pub async fn server_ip() -> Result<impl IntoResponse, StatusCode> {
     let my_local_ip = local_ip().unwrap();
 
     debug!("my local ip {:?}", my_local_ip);
 
-    Ok((StatusCode::OK, Json(ServerIpResponse { ip: my_local_ip.to_string() })))
+    Ok((
+        StatusCode::OK,
+        Json(ServerIpResponse {
+            ip: my_local_ip.to_string(),
+        }),
+    ))
 }

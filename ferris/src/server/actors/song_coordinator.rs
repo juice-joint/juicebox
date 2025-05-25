@@ -29,7 +29,7 @@ pub struct Song {
     pub uuid: Uuid,
     pub yt_link: String,
     pub status: QueuedSongStatus,
-    pub is_key_changeable: bool
+    pub is_key_changeable: bool,
 }
 
 impl Display for Song {
@@ -43,13 +43,18 @@ impl Display for Song {
 }
 
 impl Song {
-    pub fn new(name: String, yt_link: String, status: QueuedSongStatus, is_key_changeable: bool) -> Self {
+    pub fn new(
+        name: String,
+        yt_link: String,
+        status: QueuedSongStatus,
+        is_key_changeable: bool,
+    ) -> Self {
         Song {
             name: name.to_string(),
             uuid: Uuid::new_v4(),
             yt_link,
             status,
-            is_key_changeable
+            is_key_changeable,
         }
     }
 }
@@ -159,8 +164,9 @@ impl SongActor {
         match msg {
             SongActorMessage::QueueSong { song, respond_to } => {
                 if self.song_deque.contains(&song) {
-
-                    let _ = respond_to.send(Err(SongCoordinatorError::SongAlreadyQueued { name: song.name }));
+                    let _ = respond_to.send(Err(SongCoordinatorError::SongAlreadyQueued {
+                        name: song.name,
+                    }));
                 } else {
                     self.song_deque.push_back(song.clone());
 
@@ -195,7 +201,7 @@ impl SongActor {
                     Err(err) => {
                         warn!(
                             "failed to broadcast SSE event for queue update event for song: {} with error: {}", 
-                            song_uuid, 
+                            song_uuid,
                             err
                         );
                         let _ = respond_to.send(());
@@ -215,7 +221,10 @@ impl SongActor {
                         let _ = respond_to.send(next_song.clone());
                     }
                     Err(err) => {
-                        warn!("failed to broadcast SSE event for queue update event with error: {}", err);
+                        warn!(
+                            "failed to broadcast SSE event for queue update event with error: {}",
+                            err
+                        );
                         let _ = respond_to.send(next_song.clone());
                     }
                 }
@@ -225,11 +234,13 @@ impl SongActor {
                 position,
                 respond_to,
             } => {
-                if let Some(current_index) = self.song_deque.iter().position(|x| x.uuid == song_uuid) {
+                if let Some(current_index) =
+                    self.song_deque.iter().position(|x| x.uuid == song_uuid)
+                {
                     let song = self.song_deque.remove(current_index).unwrap();
                     let new_position = position.min(self.song_deque.len());
                     self.song_deque.insert(new_position, song);
-                    
+
                     match self.sse_broadcaster.send(SseEvent::QueueUpdated {
                         queue: self.song_deque.clone(),
                     }) {
@@ -239,7 +250,7 @@ impl SongActor {
                         Err(err) => {
                             warn!(
                                 "failed to broadcast SSE event for queue update event for song: {} with error: {}", 
-                                song_uuid, 
+                                song_uuid,
                                 err
                             );
                             let _ = respond_to.send(Ok(()));

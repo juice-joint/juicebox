@@ -1,4 +1,7 @@
-use std::{path::{Path, PathBuf}, process::{Command, Output}};
+use std::{
+    path::{Path, PathBuf},
+    process::{Command, Output},
+};
 
 use deps::{FetcherError, Release};
 use thiserror::Error;
@@ -39,10 +42,10 @@ pub enum ExtractError {
 pub enum ExecutionError {
     #[error("Failed to execute binary: {0}")]
     IoError(#[from] std::io::Error),
-    
+
     #[error("Binary execution failed with exit code: {0}")]
     NonZeroExit(i32),
-    
+
     #[error("Binary execution terminated by signal")]
     TerminatedBySignal,
 }
@@ -58,34 +61,32 @@ impl Binary {
     pub fn new(path: PathBuf) -> Self {
         Self { path }
     }
-    
+
     /// Get the path to the binary
     pub fn path(&self) -> &Path {
         &self.path
     }
-    
+
     /// Execute the binary with the given arguments
     pub fn execute(&self, args: &[&str]) -> Result<Output, ExecutionError> {
         debug!("Executing binary at {:?} with args: {:?}", self.path, args);
-        
-        let output = Command::new(&self.path)
-            .args(args)
-            .output()?;
-            
+
+        let output = Command::new(&self.path).args(args).output()?;
+
         if !output.status.success() {
             match output.status.code() {
                 Some(code) => return Err(ExecutionError::NonZeroExit(code)),
                 None => return Err(ExecutionError::TerminatedBySignal),
             }
         }
-        
+
         Ok(output)
     }
 }
 
 pub async fn download_and_extract_binary(
     release: Release,
-    destination_dir: impl AsRef<Path>
+    destination_dir: impl AsRef<Path>,
 ) -> Result<Binary, ExtractError> {
     let binary_path = download_and_extract_binary_path(release, destination_dir).await?;
     Ok(Binary::new(binary_path))
@@ -93,20 +94,20 @@ pub async fn download_and_extract_binary(
 
 pub async fn download_and_extract_binary_path(
     release: Release,
-    destination_dir: impl AsRef<Path>
+    destination_dir: impl AsRef<Path>,
 ) -> Result<PathBuf, ExtractError> {
     // let release = release_fetcher.get_release(platform, architecture).await
     //     .map_err(|err| ExtractError::FetchError(err))?;
-    
+
     let destination_dir = destination_dir.as_ref();
     tokio::fs::create_dir_all(destination_dir).await?;
-    
+
     // Download the archive
     debug!(
         "Downloading binary from {} to {:?}",
         release.url, destination_dir
     );
-    
+
     let response = reqwest::get(&release.url)
         .await
         .map_err(|e| {
@@ -122,19 +123,19 @@ pub async fn download_and_extract_binary_path(
                 format!("HTTP error: {}", e),
             ))
         })?;
-    
+
     let bytes = response.bytes().await.map_err(|e| {
         ExtractError::IoError(std::io::Error::new(
             std::io::ErrorKind::Other,
             format!("Failed to read response bytes: {}", e),
         ))
     })?;
-    
+
     // Determine the file type
     let is_zip = release.url.ends_with(".zip");
     let is_tar_xz = release.url.ends_with(".tar.xz");
     let is_tar_gz = release.url.ends_with(".tar.gz") || release.url.ends_with(".tgz");
-    
+
     // Create a temporary directory for archive extraction if needed
     let temp_dir = tempfile::tempdir().map_err(|e| {
         ExtractError::IoError(std::io::Error::new(
@@ -142,12 +143,12 @@ pub async fn download_and_extract_binary_path(
             format!("Failed to create temp dir: {}", e),
         ))
     })?;
-    
+
     let binary_path = if is_zip || is_tar_xz || is_tar_gz {
         // Handle archive formats
         let archive_path = temp_dir.path().join("downloaded_archive");
         tokio::fs::write(&archive_path, &bytes).await?;
-        
+
         if is_zip {
             extract_binary_from_zip(&archive_path, destination_dir, &release.binary_name).await?
         } else if is_tar_xz {
@@ -161,7 +162,7 @@ pub async fn download_and_extract_binary_path(
         tokio::fs::write(&binary_path, &bytes).await?;
         binary_path
     };
-    
+
     // Make the binary executable (on Unix platforms)
     #[cfg(unix)]
     {
@@ -170,7 +171,7 @@ pub async fn download_and_extract_binary_path(
         perms.set_mode(0o755); // rwxr-xr-x
         tokio::fs::set_permissions(&binary_path, perms).await?;
     }
-    
+
     Ok(binary_path)
 }
 

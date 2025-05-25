@@ -1,8 +1,8 @@
 use std::{collections::HashMap, path::PathBuf};
 use tauri_bundler::{
-    bundle_project, AppImageSettings, BundleBinary, BundleSettings, DebianSettings, DmgSettings, 
-    IosSettings, MacOsSettings, PackageSettings, PackageType, Position, RpmSettings, 
-    SettingsBuilder, Size, WindowsSettings, AppCategory
+    bundle_project, AppCategory, AppImageSettings, BundleBinary, BundleSettings, DebianSettings,
+    DmgSettings, IosSettings, MacOsSettings, PackageSettings, PackageType, Position, RpmSettings,
+    SettingsBuilder, Size, WindowsSettings,
 };
 use tauri_utils::config::WebviewInstallMode;
 
@@ -13,12 +13,12 @@ fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
         description: "loool".to_string(),
         homepage: None,
         authors: Some(vec!["jpiece".to_string(), "bigbitchtrev".to_string()]),
-        default_run: Some("juicebox".to_string()) // Add default_run to specify the main binary
+        default_run: Some("juicebox".to_string()), // Add default_run to specify the main binary
     };
 
     let package_types = vec![
         PackageType::from_short_name("deb").unwrap(),
-        PackageType::from_short_name("dmg").unwrap()
+        PackageType::from_short_name("dmg").unwrap(),
     ];
 
     let bundle_settings = BundleSettings {
@@ -34,7 +34,9 @@ fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
         category: Some(AppCategory::Utility), // Set a proper category
         file_associations: Some(vec![]),
         short_description: Some("A short description of the app".to_string()),
-        long_description: Some("A longer, more detailed description of the application".to_string()),
+        long_description: Some(
+            "A longer, more detailed description of the application".to_string(),
+        ),
         bin: None,
         external_bin: None,
         deep_link_protocols: None,
@@ -52,12 +54,12 @@ fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
             pre_install_script: None,
             post_install_script: None,
             pre_remove_script: None,
-            post_remove_script: None
+            post_remove_script: None,
         },
         appimage: AppImageSettings {
             files: HashMap::new(),
             bundle_media_framework: true,
-            bundle_xdg_open: true
+            bundle_xdg_open: true,
         },
         rpm: RpmSettings {
             depends: None,
@@ -73,17 +75,20 @@ fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
             post_install_script: None,
             pre_remove_script: None,
             post_remove_script: None,
-            compression: None
+            compression: None,
         },
         dmg: DmgSettings {
             background: None,
             window_position: None,
-            window_size: Size { width: 200, height: 100 },
+            window_size: Size {
+                width: 200,
+                height: 100,
+            },
             app_position: Position { x: 0, y: 0 },
-            application_folder_position: Position { x: 100, y: 0 }
+            application_folder_position: Position { x: 100, y: 0 },
         },
         ios: IosSettings {
-            bundle_version: None
+            bundle_version: None,
         },
         macos: MacOsSettings {
             frameworks: None,
@@ -95,7 +100,7 @@ fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
             hardened_runtime: false,
             provider_short_name: None,
             entitlements: None,
-            info_plist_path: None
+            info_plist_path: None,
         },
         updater: None,
         windows: WindowsSettings {
@@ -108,8 +113,8 @@ fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
             icon_path: PathBuf::new(), // Use a proper path
             webview_install_mode: WebviewInstallMode::EmbedBootstrapper { silent: true },
             allow_downgrades: false,
-            sign_command: None
-        }
+            sign_command: None,
+        },
     };
 
     let settings = SettingsBuilder::new()

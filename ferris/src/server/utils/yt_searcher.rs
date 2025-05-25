@@ -27,10 +27,10 @@ pub struct YtSearcher {}
 impl YtSearcher {
     pub async fn search(&self, query: &str) -> Result<Vec<SearchResult>, SearchError> {
         info!("searching yt-dlp for: {}", query);
-        
+
         let num_results = 10;
         let search_query = format!("ytsearch{}:\"{}\"", num_results, unidecode(query));
-        
+
         let args = [
             "-j",
             "--no-playlist",
@@ -39,9 +39,8 @@ impl YtSearcher {
             "!is_channel",
             &search_query,
         ];
-        
-        debug!("yt-dlp search command: {:?}", args.join(" "));
 
+        debug!("yt-dlp search command: {:?}", args.join(" "));
 
         let ytdlp_path = globals::get_binary_path("yt-dlp");
         debug!("Using yt-dlp from path: {}", ytdlp_path.display());
@@ -58,16 +57,19 @@ impl YtSearcher {
             .filter(|line| !line.trim().is_empty())
             .map(|line| {
                 let json: serde_json::Value = serde_json::from_str(line)?;
-                
-                let title = json.get("title")
+
+                let title = json
+                    .get("title")
                     .and_then(|v| v.as_str())
                     .ok_or(SearchError::MissingFields)?;
-                    
-                let url = json.get("url")
+
+                let url = json
+                    .get("url")
                     .and_then(|v| v.as_str())
                     .ok_or(SearchError::MissingFields)?;
-                    
-                let id = json.get("id")
+
+                let id = json
+                    .get("id")
                     .and_then(|v| v.as_str())
                     .ok_or(SearchError::MissingFields)?;
 

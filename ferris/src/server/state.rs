@@ -3,14 +3,20 @@ use std::sync::Arc;
 use axum::extract::FromRef;
 use tokio::sync;
 
-use crate::server::{actors::{song_coordinator::SongActorHandle, video_downloader::VideoDlActorHandle, video_searcher::VideoSearcherActorHandle}, routes::sse::SseEvent};
+use crate::server::{
+    actors::{
+        song_coordinator::SongActorHandle, video_downloader::VideoDlActorHandle,
+        video_searcher::VideoSearcherActorHandle,
+    },
+    routes::sse::SseEvent,
+};
 
 #[derive(Clone)]
 pub struct AppState {
     pub song_actor_handle: Arc<SongActorHandle>,
     pub videodl_actor_handle: Arc<VideoDlActorHandle>,
     pub videosearcher_actor_handle: Arc<VideoSearcherActorHandle>,
-    pub sse_broadcaster: Arc<sync::broadcast::Sender<SseEvent>>
+    pub sse_broadcaster: Arc<sync::broadcast::Sender<SseEvent>>,
 }
 
 impl AppState {
@@ -18,13 +24,13 @@ impl AppState {
         song_actor_handle: Arc<SongActorHandle>,
         videodl_actor_handle: Arc<VideoDlActorHandle>,
         videosearcher_actor_handle: Arc<VideoSearcherActorHandle>,
-        sse_broadcaster: Arc<sync::broadcast::Sender<SseEvent>>
+        sse_broadcaster: Arc<sync::broadcast::Sender<SseEvent>>,
     ) -> Self {
         AppState {
             song_actor_handle,
             videodl_actor_handle,
             videosearcher_actor_handle,
-            sse_broadcaster
+            sse_broadcaster,
         }
     }
 }
@@ -52,4 +58,3 @@ impl FromRef<AppState> for Arc<sync::broadcast::Sender<SseEvent>> {
         app_state.sse_broadcaster.clone()
     }
 }
-

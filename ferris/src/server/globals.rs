@@ -1,6 +1,6 @@
 use once_cell::sync::OnceCell;
-use std::path::PathBuf;
 use std::collections::HashMap;
+use std::path::PathBuf;
 use std::sync::RwLock;
 
 static CONFIG_DIR: OnceCell<PathBuf> = OnceCell::new();
@@ -29,7 +29,7 @@ pub fn get_binary_path(name: &str) -> PathBuf {
             return path.clone();
         }
     }
-    
+
     // Fall back to the default path in CONFIG_DIR
     CONFIG_DIR
         .get()

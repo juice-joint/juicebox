@@ -1,9 +1,17 @@
 use serde::{Deserialize, Serialize};
-use std::{fs::{self, File}, io::BufReader, path::Path, sync::Arc};
+use std::{
+    fs::{self, File},
+    io::BufReader,
+    path::Path,
+    sync::Arc,
+};
 use tokio::sync::oneshot;
 use tracing::{debug, error, info, trace};
 
-use crate::server::utils::{dash_processor::{DashProcessor, ProcessingMode}, yt_downloader::{VideoProcessError, YtDownloader}};
+use crate::server::utils::{
+    dash_processor::{DashProcessor, ProcessingMode},
+    yt_downloader::{VideoProcessError, YtDownloader},
+};
 
 #[derive(Serialize, Deserialize)]
 struct VideoStatus {
@@ -33,7 +41,6 @@ impl VideoDlActor {
         base_dir: String,
         video_downloader: Arc<YtDownloader>,
         consumer_id: u8,
-
     ) -> Self {
         trace!("Initializing VideoDlActor consumer {}", consumer_id);
         VideoDlActor {
@@ -89,7 +96,7 @@ impl VideoDlActor {
                                 self.consumer_id, video_path, e
                             );
                             let _ = respond_to.send(Err(VideoProcessError::PitchShiftError(
-                                format!("Failed to clear existing folder: {}", e)
+                                format!("Failed to clear existing folder: {}", e),
                             )));
                             return;
                         }
@@ -159,7 +166,7 @@ impl VideoDlActor {
 
         // Check if corresponding chunk file exists
         let chunk_path = format!("{}/chunk-stream1-{:05}.m4s", base_path, status.segments);
-    
+
         debug!("chunk_path: {}", chunk_path);
 
         let chunk_exists = Path::new(&chunk_path).exists();
@@ -200,9 +207,10 @@ impl VideoDlActor {
                 "Consumer {} failed to create directory {}: {}",
                 self.consumer_id, dir, e
             );
-            return Err(VideoProcessError::PitchShiftError(
-                format!("Failed to create directory: {}", e)
-            ));
+            return Err(VideoProcessError::PitchShiftError(format!(
+                "Failed to create directory: {}",
+                e
+            )));
         }
 
         let status_file_path = format!("{}/status.json", dir);
@@ -235,9 +243,7 @@ impl VideoDlActor {
             Err(e) => {
                 error!(
                     "Consumer {} failed to create status file {}: {}",
-                    self.consumer_id,
-                    status_file_path,
-                    e
+                    self.consumer_id, status_file_path, e
                 );
                 return Err(VideoProcessError::PitchShiftError(format!(
                     "Failed to create status file: {}",

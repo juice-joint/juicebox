@@ -1,8 +1,4 @@
-
-use axum::{
-    response::IntoResponse,
-    Json
-};
+use axum::{response::IntoResponse, Json};
 
 pub async fn healthcheck() -> impl IntoResponse {
     const MESSAGE: &str = "Build Simple CRUD API in Rust using Axum";

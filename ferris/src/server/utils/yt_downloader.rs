@@ -49,7 +49,7 @@ impl YtDownloader {
             "mp4".to_string(),
             "--restrict-filenames".to_string(),
             "--print".to_string(),
-            "filename,duration".to_string(),  // Print both filename and duration
+            "filename,duration".to_string(), // Print both filename and duration
             "--no-simulate".to_string(),
             "--ffmpeg-location".to_string(),
             ffmpeg_path.to_string_lossy().to_string(),
@@ -81,7 +81,7 @@ impl YtDownloader {
     fn parse_output(&self, output: &[u8]) -> Result<VideoMetadata, VideoProcessError> {
         let output_str = String::from_utf8(output.to_vec())
             .map_err(|e| VideoProcessError::FilenameError(e.to_string()))?;
-        
+
         // Split the output into lines
         let lines: Vec<&str> = output_str.lines().collect();
         if lines.len() != 2 {
@@ -102,16 +102,18 @@ impl YtDownloader {
         let path_parts: Vec<&str> = filename.rsplitn(2, '/').collect();
         debug!("file path parts: {:?}", path_parts);
         if path_parts.len() != 2 {
-            return Err(VideoProcessError::FilenameError("Invalid path format".to_string()));
+            return Err(VideoProcessError::FilenameError(
+                "Invalid path format".to_string(),
+            ));
         }
 
         let full_filename = path_parts[0];
         let directory = path_parts[1];
 
         // Split the filename and extension
-        let (name, ext) = full_filename
-            .rsplit_once('.')
-            .ok_or_else(|| VideoProcessError::FilenameError("Invalid filename format".to_string()))?;
+        let (name, ext) = full_filename.rsplit_once('.').ok_or_else(|| {
+            VideoProcessError::FilenameError("Invalid filename format".to_string())
+        })?;
 
         Ok(VideoMetadata {
             directory: directory.to_string(),

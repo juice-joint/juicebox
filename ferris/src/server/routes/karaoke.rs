@@ -3,15 +3,17 @@ use std::sync::Arc;
 use axum::{
     extract::{Query, State},
     http::StatusCode,
-    response::
-        IntoResponse
-    ,
+    response::IntoResponse,
     Json,
 };
 use serde::Deserialize;
 use tracing::{error, info};
 
-use crate::server::actors::{song_coordinator::{QueuedSongStatus, Song, SongActorHandle}, video_downloader::VideoDlActorHandle, video_searcher::VideoSearcherActorHandle};
+use crate::server::actors::{
+    song_coordinator::{QueuedSongStatus, Song, SongActorHandle},
+    video_downloader::VideoDlActorHandle,
+    video_searcher::VideoSearcherActorHandle,
+};
 
 #[derive(Deserialize)]
 pub struct QueueSong {
@@ -171,4 +173,3 @@ pub async fn search(
         }
     }
 }
-

@@ -19,11 +19,13 @@ impl IntoResponse for FileError {
     }
 }
 
-pub async fn serve_dash_file(Path((song_name, file)): Path<(String, String)>) -> Result<Response, FileError> {
+pub async fn serve_dash_file(
+    Path((song_name, file)): Path<(String, String)>,
+) -> Result<Response, FileError> {
     let path = PathBuf::from("./")
         .join("assets")
         .join(&song_name)
-        .join (&file);
+        .join(&file);
 
     let mut file = File::open(&path).await.map_err(FileError)?;
     let mut contents = vec![];
@@ -38,4 +40,3 @@ pub async fn serve_dash_file(Path((song_name, file)): Path<(String, String)>) ->
 
     Ok((StatusCode::OK, [("Content-Type", content_type)], contents).into_response())
 }
-

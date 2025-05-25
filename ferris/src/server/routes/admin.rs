@@ -41,9 +41,7 @@ pub async fn get_key(
 ) -> Result<impl IntoResponse, StatusCode> {
     let song_actor_response = song_actor_handle.get_key().await;
     match song_actor_response {
-        Ok(current_key) => { 
-            Ok((StatusCode::OK, Json(current_key))) 
-        },
+        Ok(current_key) => Ok((StatusCode::OK, Json(current_key))),
         Err(_) => Err(StatusCode::INTERNAL_SERVER_ERROR),
     }
 }
@@ -89,4 +87,3 @@ pub async fn restart_song(
     let _ = sse_broadcaster.send(SseEvent::RestartSong);
     Ok(StatusCode::ACCEPTED)
 }
-

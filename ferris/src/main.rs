@@ -1,10 +1,12 @@
 use binary_sidecar::{
-    deps::{ffmpeg::FfmpegFetcher, ytdlp::YtdlpFetcher, ReleaseFetcher}, download_and_extract_binary, download_and_extract_binary_path, utils::{architecture::Architecture, platform::Platform}
+    deps::{ffmpeg::FfmpegFetcher, ytdlp::YtdlpFetcher, ReleaseFetcher},
+    download_and_extract_binary_path,
+    utils::{architecture::Architecture, platform::Platform},
 };
-use desktop::{webview, window::{AppEvent, WindowEventHandle}};
-use server::globals::{self, init_config_dir, set_binary_path};
+use desktop::window::{AppEvent, WindowEventHandle};
+use server::globals::{init_config_dir, set_binary_path};
+use std::{net::SocketAddr, path::PathBuf, thread, time::Duration};
 use tao::event_loop::EventLoopBuilder;
-use std::{net::SocketAddr, path::PathBuf, sync::{atomic::Ordering, Arc}, thread, time::Duration};
 use tokio::sync::oneshot;
 
 mod desktop;
@@ -41,10 +43,13 @@ async fn main() {
     tokio::spawn(async move {
         tracing::info!("Starting binary initialization");
 
-        if (DOWNLOAD_FFMPEG) {
+        if DOWNLOAD_FFMPEG {
             let ffmpeg_fetcher = FfmpegFetcher::new("ffmpeg".to_string());
             let ffmpeg_path = match download_and_extract_binary_path(
-                ffmpeg_fetcher.get_release(&platform, &architecture).await.unwrap(),
+                ffmpeg_fetcher
+                    .get_release(&platform, &architecture)
+                    .await
+                    .unwrap(),
                 &config_dir,
             )
             .await
@@ -61,10 +66,13 @@ async fn main() {
             set_binary_path("ffmpeg", ffmpeg_path);
         }
 
-        if (DOWNLOAD_YTDLP) { 
+        if DOWNLOAD_YTDLP {
             let ytdlp_fetcher = YtdlpFetcher::new();
             let ytdlp_path = match download_and_extract_binary_path(
-                ytdlp_fetcher.get_release(&platform, &architecture).await.unwrap(),
+                ytdlp_fetcher
+                    .get_release(&platform, &architecture)
+                    .await
+                    .unwrap(),
                 &config_dir,
             )
             .await
@@ -84,11 +92,9 @@ async fn main() {
         tracing::info!("Binary initialization complete, redirecting to /goldie");
         window_event_handle_clone.load_url("http://localhost:8000/goldie".to_string());
 
-
         window_event_handle_clone.hide_window();
         thread::sleep(Duration::from_millis(1000));
         window_event_handle_clone.show_window();
-
 
         init_config_dir(config_dir);
     });
@@ -97,7 +103,6 @@ async fn main() {
         Ok(_) => tracing::info!("Desktop app closed successfully"),
         Err(e) => tracing::error!("Desktop app error: {}", e),
     }
-
 
     let _ = server_handle.abort();
     tracing::info!("Application shutting down");

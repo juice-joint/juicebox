@@ -10,7 +10,7 @@ const LINUX_FFMPEG_URL_TEMPLATE: &'static str =
     "https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-{}-static.tar.xz";
 
 pub struct FfmpegFetcher {
-    binary_name: String
+    binary_name: String,
 }
 
 impl FfmpegFetcher {

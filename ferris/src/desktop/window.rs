@@ -1,11 +1,6 @@
-use serde::ser::Error;
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::Arc;
-use std::thread;
-use std::time::Duration;
 use tao::{
     event::{Event, WindowEvent},
-    event_loop::{ControlFlow, EventLoop, EventLoopBuilder, EventLoopProxy},
+    event_loop::{ControlFlow, EventLoop, EventLoopProxy},
     window::{Fullscreen, WindowBuilder},
 };
 use wry::WebViewBuilder;
@@ -14,7 +9,6 @@ pub enum AppEvent {
     LoadUrl(String),
     Hide,
     Show,
-    Exit,
 }
 
 #[derive(Clone)]
@@ -77,7 +71,7 @@ pub fn create_desktop_webview(
         builder.build_gtk(vbox)?
     };
 
-    // Run the event loop
+    // Run the event loop, for some reason this can't be in a different function...
     event_loop.run(move |event, _, control_flow| {
         *control_flow = ControlFlow::Wait;
 
@@ -91,17 +85,20 @@ pub fn create_desktop_webview(
             }
             Event::UserEvent(app_event) => match app_event {
                 AppEvent::LoadUrl(url) => {
-                    println!("LOADING URL");
-                    let test = webview.load_url(&url);
-                },
+                    tracing::info!("Webview LoadUrl requested");
+                    match webview.load_url(&url) {
+                        Ok(_) => tracing::info!("Successfully loaded url {} in webview", url),
+                        Err(_) => tracing::error!("Error loading url {} in webview", url),
+                    }
+                }
                 AppEvent::Hide => {
-                    println!("hiding!");
+                    tracing::info!("Window hide requested");
                     window.set_visible(false);
                 }
                 AppEvent::Show => {
+                    tracing::info!("Window show requested");
                     window.set_visible(true);
-                },
-                AppEvent::Exit => {}
+                }
             },
             _ => (),
         }
