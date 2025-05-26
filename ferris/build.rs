@@ -2,22 +2,33 @@ use core::panic;
 use std::env;
 use std::fs;
 use std::path::Path;
+use std::path::PathBuf;
 use std::process::Command;
 
 fn main() {
-    println!("huhehuahwefawef");
-
+    let manifest_dir = env::var("CARGO_MANIFEST_DIR").unwrap();
     let out_dir = Path::new(&env::var("CARGO_MANIFEST_DIR").unwrap()).join("assets");
 
-    // Create assets directory if it doesn't exist
+    let goldie_dir = Path::new(&manifest_dir).join("..").join("goldie");
+    let phippy_dir = Path::new(&manifest_dir).join("..").join("phippy");
+
+    // little hack to rerun the builds everytime on cargo build/run
+    if goldie_dir.exists() {
+        println!("cargo:rerun-if-changed={}", goldie_dir.display());
+    }
+
+    if phippy_dir.exists() {
+        println!("cargo:rerun-if-changed={}", phippy_dir.display());
+    }
+
     fs::create_dir_all(&out_dir).unwrap();
 
-    // Build Goldie React app
-    println!("Building Goldie React app...");
-    let goldie_dir = Path::new(&env::var("CARGO_MANIFEST_DIR").unwrap())
-        .join("..")
-        .join("goldie");
+    build_goldie(&goldie_dir, &out_dir);
+    build_phippy(&phippy_dir, &out_dir);
+}
 
+fn build_goldie(goldie_dir: &PathBuf, out_dir: &PathBuf) {
+    println!("Building Goldie React app...");
     if goldie_dir.exists() {
         // First install dependencies with bun
         println!("Installing Goldie dependencies...");
@@ -57,13 +68,10 @@ fn main() {
     } else {
         println!("Goldie directory not found, skipping build");
     }
+}
 
-    // Build Phippy React app
+fn build_phippy(phippy_dir: &PathBuf, out_dir: &PathBuf) {
     println!("Building Phippy React app...");
-    let phippy_dir = Path::new(&env::var("CARGO_MANIFEST_DIR").unwrap())
-        .join("..")
-        .join("phippy");
-
     if phippy_dir.exists() {
         // First install dependencies with bun
         println!("Installing Phippy dependencies...");
@@ -105,7 +113,7 @@ fn main() {
     }
 }
 
-// Helper function to recursively copy directories
+// Recursively copy directories
 fn copy_dir_all(src: &Path, dst: &Path) -> std::io::Result<()> {
     fs::create_dir_all(&dst)?;
     for entry in fs::read_dir(src)? {

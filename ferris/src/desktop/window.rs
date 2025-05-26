@@ -44,6 +44,8 @@ pub fn create_desktop_webview(
         .build(&event_loop)
         .expect("Failed to build window");
 
+    window.set_cursor_visible(false);
+
     // Create the webview builder
     let builder = WebViewBuilder::new()
         .with_url(url)

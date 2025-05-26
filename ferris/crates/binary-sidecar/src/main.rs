@@ -10,7 +10,6 @@ use binary_sidecar::{
 
 #[tokio::main]
 async fn main() {
-    println!("Hello, world!");
     // Use Platform and Architecture from binary_sidecar library
     let platform = Platform::detect();
     let architecture = Architecture::detect();

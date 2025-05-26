@@ -905,16 +905,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "cargo-config"
-version = "0.1.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cc34cb0dcd56152f43057c0f6718d2eedec32647a0e363f64253a42eecdaebd3"
-dependencies = [
- "rustc-serialize",
- "toml 0.1.30",
-]
-
-[[package]]
 name = "cast5"
 version = "0.11.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1106,7 +1096,7 @@ dependencies = [
  "rust-ini",
  "serde",
  "serde_json",
- "toml 0.8.21",
+ "toml",
  "winnow 0.7.7",
  "yaml-rust2",
 ]
@@ -2090,7 +2080,7 @@ dependencies = [
  "atomic",
  "pear",
  "serde",
- "toml 0.8.21",
+ "toml",
  "uncased",
  "version_check",
 ]
@@ -3466,7 +3456,6 @@ dependencies = [
  "axum-embed",
  "axum-extra",
  "binary-sidecar",
- "cargo-config",
  "config",
  "dirs 6.0.0",
  "dotenv",
@@ -3491,7 +3480,7 @@ dependencies = [
  "tokio",
  "tokio-stream",
  "tokio-util",
- "toml 0.8.21",
+ "toml",
  "tower",
  "tower-http",
  "tracing",
@@ -5559,12 +5548,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "719b953e2095829ee67db738b3bfa9fa368c94900df327b3f07fe6e794d2fe1f"
 
 [[package]]
-name = "rustc-serialize"
-version = "0.3.25"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fe834bc780604f4674073badbad26d7219cadfb4a2275802db12cbae17498401"
-
-[[package]]
 name = "rustc_version"
 version = "0.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6425,7 +6408,7 @@ dependencies = [
  "cfg-expr",
  "heck 0.5.0",
  "pkg-config",
- "toml 0.8.21",
+ "toml",
  "version-compare",
 ]
 
@@ -6605,7 +6588,7 @@ dependencies = [
  "serde_json",
  "serde_with",
  "thiserror 2.0.12",
- "toml 0.8.21",
+ "toml",
  "url",
  "urlpattern",
  "uuid",
@@ -6844,15 +6827,6 @@ dependencies = [
  "futures-sink",
  "pin-project-lite",
  "tokio",
-]
-
-[[package]]
-name = "toml"
-version = "0.1.30"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0590d72182e50e879c4da3b11c6488dae18fccb1ae0c7a3eda18e16795844796"
-dependencies = [
- "rustc-serialize",
 ]
 
 [[package]]
