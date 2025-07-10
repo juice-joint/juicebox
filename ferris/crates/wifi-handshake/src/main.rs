@@ -54,9 +54,43 @@ enum Commands {
 
 #[tokio::main]
 async fn main() -> Result<()> {
+    let raw_args: Vec<String> = std::env::args().collect();
+    
+    // Handle wpa_cli calls BEFORE clap parsing
+    // wpa_cli calls us like: autoap wlan0 AP-ENABLED [mac]
+    // or: autoap reset, autoap start wlan0
+    if raw_args.len() >= 2 {
+        let second_arg = &raw_args[1];
+        
+        // Check if this looks like a wpa_cli call
+        if second_arg == "reset" || 
+           second_arg == "start" || 
+           (second_arg.starts_with("wlan") && raw_args.len() >= 3) {
+            
+            // Initialize basic tracing for wpa_cli calls
+            tracing_subscriber::fmt()
+                .with_env_filter("autoap=info")
+                .with_target(false)
+                .with_thread_ids(true)
+                .init();
+            
+            // Check if autoAP is installed
+            if !utils::is_autoap_installed().await {
+                error!("autoAP is not installed but being called by wpa_cli");
+                std::process::exit(1);
+            }
+            
+            info!("Called by wpa_cli with args: {:?}", &raw_args[1..]);
+            let autoap = AutoAp::new().await?;
+            autoap.run(raw_args).await?;
+            return Ok(());
+        }
+    }
+    
+    // If we get here, it's a normal CLI call - parse with clap
     let cli = Cli::parse();
     
-    // Initialize tracing
+    // Initialize tracing with user's verbosity preference
     let log_level = if cli.verbose { "debug" } else { "info" };
     tracing_subscriber::fmt()
         .with_env_filter(format!("autoap={}", log_level))
@@ -66,27 +100,6 @@ async fn main() -> Result<()> {
 
     // Check if autoAP is already installed
     let is_installed = utils::is_autoap_installed().await;
-    
-    // Handle the case where we're called by wpa_cli with raw arguments
-    // wpa_cli calls us like: autoap wlan0 AP-ENABLED [mac]
-    let raw_args: Vec<String> = std::env::args().collect();
-    
-    // If we have 3+ args and the second arg looks like an interface name and third looks like a state
-    if raw_args.len() >= 3 && 
-       raw_args[1].starts_with("wlan") && 
-       ["AP-ENABLED", "AP-DISABLED", "CONNECTED", "AP-STA-CONNECTED", "AP-STA-DISCONNECTED", "DISCONNECTED", "reset", "start"]
-           .contains(&raw_args[2].as_str()) {
-        
-        if !is_installed {
-            error!("autoAP is not installed but being called by wpa_cli");
-            std::process::exit(1);
-        }
-        
-        info!("Called by wpa_cli with args: {:?}", &raw_args[1..]);
-        let autoap = AutoAp::new().await?;
-        autoap.run(raw_args).await?;
-        return Ok(());
-    }
 
     match cli.command {
         Some(Commands::Install) => {
