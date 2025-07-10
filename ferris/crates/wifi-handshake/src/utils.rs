@@ -11,15 +11,24 @@ pub async fn is_autoap_installed() -> bool {
         "/etc/systemd/system/wpa-autoap@wlan0.service",
         "/etc/systemd/system/wpa-autoap-restore.service",
         "/etc/wpa_supplicant/wpa_supplicant-wlan0.conf",
-        "/etc/systemd/network/11-wlan0.network",
         "/etc/systemd/network/12-wlan0AP.network",
     ];
 
+    // Check required files
     for file in &required_files {
         if !Path::new(file).exists() {
             debug!("Missing required file for autoAP: {}", file);
             return false;
         }
+    }
+
+    // For the client network file, check both locations since it moves between them
+    let client_network_file = "/etc/systemd/network/11-wlan0.network";
+    let client_network_backup = "/etc/systemd/network/11-wlan0.network~";
+    
+    if !Path::new(client_network_file).exists() && !Path::new(client_network_backup).exists() {
+        debug!("Missing client network file (checked both {} and {})", client_network_file, client_network_backup);
+        return false;
     }
 
     debug!("All required autoAP files found - installation detected");

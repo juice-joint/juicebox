@@ -83,7 +83,6 @@ async fn main() -> Result<()> {
                     "/etc/systemd/system/wpa-autoap@wlan0.service", 
                     "/etc/systemd/system/wpa-autoap-restore.service",
                     "/etc/wpa_supplicant/wpa_supplicant-wlan0.conf",
-                    "/etc/systemd/network/11-wlan0.network",
                     "/etc/systemd/network/12-wlan0AP.network",
                 ];
                 
@@ -93,6 +92,17 @@ async fn main() -> Result<()> {
                     } else {
                         eprintln!("✗ {} (MISSING)", file);
                     }
+                }
+                
+                // Check client network file (can be in either location)
+                let client_file = "/etc/systemd/network/11-wlan0.network";
+                let client_backup = "/etc/systemd/network/11-wlan0.network~";
+                if std::path::Path::new(client_file).exists() {
+                    eprintln!("✓ {} (client mode)", client_file);
+                } else if std::path::Path::new(client_backup).exists() {
+                    eprintln!("✓ {} (AP mode - client config backed up)", client_backup);
+                } else {
+                    eprintln!("✗ Client network config missing (checked both {} and {})", client_file, client_backup);
                 }
                 
                 error!("autoAP is not installed but being called by wpa_cli");
