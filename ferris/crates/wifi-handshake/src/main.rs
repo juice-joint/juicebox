@@ -76,6 +76,25 @@ async fn main() -> Result<()> {
             
             // Check if autoAP is installed
             if !utils::is_autoap_installed().await {
+                // Let's debug which files are missing
+                eprintln!("autoAP installation check failed. Checking files...");
+                let required_files = [
+                    "/usr/local/bin/autoAP.conf",
+                    "/etc/systemd/system/wpa-autoap@wlan0.service", 
+                    "/etc/systemd/system/wpa-autoap-restore.service",
+                    "/etc/wpa_supplicant/wpa_supplicant-wlan0.conf",
+                    "/etc/systemd/network/11-wlan0.network",
+                    "/etc/systemd/network/12-wlan0AP.network",
+                ];
+                
+                for file in &required_files {
+                    if std::path::Path::new(file).exists() {
+                        eprintln!("✓ {}", file);
+                    } else {
+                        eprintln!("✗ {} (MISSING)", file);
+                    }
+                }
+                
                 error!("autoAP is not installed but being called by wpa_cli");
                 std::process::exit(1);
             }

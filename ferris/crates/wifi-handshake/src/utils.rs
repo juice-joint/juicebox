@@ -22,6 +22,7 @@ pub async fn is_autoap_installed() -> bool {
         }
     }
 
+    debug!("All required autoAP files found - installation detected");
     true
 }
 
