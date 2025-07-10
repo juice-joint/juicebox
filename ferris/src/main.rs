@@ -1,19 +1,15 @@
-use binary_sidecar::{
-    deps::{ffmpeg::FfmpegFetcher, ytdlp::YtdlpFetcher, ReleaseFetcher},
-    download_and_extract_binary_path,
-    utils::{architecture::Architecture, platform::Platform},
-};
 use desktop::window::{AppEvent, WindowEventHandle};
-use server::globals::{init_config_dir, set_binary_path};
-use std::{net::SocketAddr, path::PathBuf, thread, time::Duration};
+use std::{net::SocketAddr, path::PathBuf, time::Duration};
 use tao::event_loop::EventLoopBuilder;
 use tokio::{sync::oneshot, task::JoinHandle};
+use tracing::{info, error, warn};
+use ui_state_controller::UIStateController;
+use binary_initializer::BinaryInitializer;
 
+mod binary_initializer;
 mod desktop;
 mod server;
-
-const DOWNLOAD_FFMPEG: bool = true;
-const DOWNLOAD_YTDLP: bool = true;
+mod ui_state_controller;
 
 #[tokio::main]
 async fn main() {
@@ -27,23 +23,24 @@ async fn main() {
 
     // Create window event loop and handle
     let (event_loop, window_event_handle) = create_window_components();
+    let ui_controller = UIStateController::new(window_event_handle.clone());
 
-    // Initialize binaries
-    initialize_binaries(config_dir.clone(), window_event_handle.clone()).await;
+    // Always start connectivity monitoring - it will handle initialization when online
+    start_connectivity_monitoring(config_dir.clone(), ui_controller.clone()).await;
 
     // Run the desktop window
     match run_desktop_window(event_loop).await {
-        Ok(_) => tracing::info!("Desktop app closed successfully"),
-        Err(e) => tracing::error!("Desktop app error: {}", e),
+        Ok(_) => info!("Desktop app closed successfully"),
+        Err(e) => error!("Desktop app error: {}", e),
     }
 
     // Cleanup
     server_handle.abort();
-    tracing::info!("Application shutting down");
+    info!("Application shutting down");
 }
 
 async fn start_server(addr: SocketAddr) -> JoinHandle<()> {
-    tracing::info!("Starting server on {}", addr);
+    info!("Starting server on {}", addr);
 
     let (tx, rx) = oneshot::channel();
     let server_handle = tokio::spawn(async move {
@@ -51,78 +48,11 @@ async fn start_server(addr: SocketAddr) -> JoinHandle<()> {
     });
 
     rx.await.expect("Failed to receive server ready signal");
-    tracing::info!("Server is ready");
+    info!("Server is ready");
 
     server_handle
 }
 
-async fn initialize_binaries(config_dir: PathBuf, window_event_handle: WindowEventHandle) {
-    tokio::spawn(async move {
-        tracing::info!("Starting binary initialization");
-
-        let platform = Platform::detect();
-        let architecture = Architecture::detect();
-
-        if DOWNLOAD_FFMPEG {
-            let ffmpeg_fetcher = FfmpegFetcher::new("ffmpeg".to_string());
-            let ffmpeg_path = match download_and_extract_binary_path(
-                ffmpeg_fetcher
-                    .get_release(&platform, &architecture)
-                    .await
-                    .unwrap(),
-                &config_dir,
-            )
-            .await
-            {
-                Ok(path) => {
-                    tracing::info!(
-                        "ffmpeg binary downloaded and extracted at {}",
-                        path.display()
-                    );
-                    path
-                }
-                Err(e) => {
-                    tracing::error!("Failed to initialize ffmpeg: {}", e);
-                    return;
-                }
-            };
-            set_binary_path("ffmpeg", ffmpeg_path);
-        }
-
-        if DOWNLOAD_YTDLP {
-            let ytdlp_fetcher = YtdlpFetcher::new();
-            let ytdlp_path = match download_and_extract_binary_path(
-                ytdlp_fetcher
-                    .get_release(&platform, &architecture)
-                    .await
-                    .unwrap(),
-                &config_dir,
-            )
-            .await
-            {
-                Ok(path) => {
-                    tracing::info!(
-                        "yt-dlp binary downloaded and extracted at: {}",
-                        path.display()
-                    );
-                    path
-                }
-                Err(e) => {
-                    tracing::error!("Failed to initialize yt-dlp: {}", e);
-                    return;
-                }
-            };
-            set_binary_path("yt-dlp", ytdlp_path);
-        }
-
-        tracing::info!("Binary initialization complete, redirecting to /goldie");
-        window_event_handle.load_url("http://localhost:8000/goldie?view=home".to_string());
-        window_event_handle.hide_window();
-        thread::sleep(Duration::from_millis(100));
-        window_event_handle.show_window();
-        init_config_dir(config_dir);
-    });
-}
 
 fn create_window_components() -> (tao::event_loop::EventLoop<AppEvent>, WindowEventHandle) {
     let event_loop = EventLoopBuilder::<AppEvent>::with_user_event().build();
@@ -132,10 +62,60 @@ fn create_window_components() -> (tao::event_loop::EventLoop<AppEvent>, WindowEv
     (event_loop, window_event_handle)
 }
 
+async fn check_internet_connectivity() -> bool {
+    // Try to connect to a reliable DNS server (Google's 8.8.8.8)
+    use std::net::SocketAddr;
+    use tokio::net::TcpStream;
+    use tokio::time::timeout;
+    
+    let addr: SocketAddr = "8.8.8.8:53".parse().unwrap();
+    let connect_timeout = Duration::from_secs(3);
+    
+    match timeout(connect_timeout, TcpStream::connect(addr)).await {
+        Ok(Ok(_)) => true,
+        _ => false,
+    }
+}
+
+async fn start_connectivity_monitoring(config_dir: PathBuf, ui_controller: UIStateController) {
+    tokio::spawn(async move {
+        info!("Starting connectivity monitoring");
+        let mut was_connected = false;
+        
+        loop {
+            let is_connected = check_internet_connectivity().await;
+            
+            if is_connected && !was_connected {
+                // Connection restored or established
+                info!("Connected to internet!");
+                
+                if BinaryInitializer::are_binaries_initialized() {
+                    // Binaries already initialized, just go to home
+                    ui_controller.show_home();
+                } else {
+                    // Need to initialize binaries
+                    ui_controller.handle_connectivity_restored();
+                    BinaryInitializer::initialize(config_dir.clone(), ui_controller.clone()).await;
+                }
+            } else if !is_connected && was_connected {
+                // Connection lost
+                warn!("Lost internet connection");
+                ui_controller.show_waiting_for_wifi();
+            }
+            
+            was_connected = is_connected;
+            tokio::time::sleep(Duration::from_secs(3)).await;
+        }
+    });
+}
+
 async fn run_desktop_window(
     event_loop: tao::event_loop::EventLoop<AppEvent>,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    desktop::window::create_desktop_webview("http://localhost:8000/goldie?view=loading", event_loop)
+    let is_connected = check_internet_connectivity().await;
+    let initial_url = UIStateController::get_initial_url(is_connected);
+    
+    desktop::window::create_desktop_webview(initial_url, event_loop)
         .map(|_| ())
         .map_err(|e| Box::new(e) as Box<dyn std::error::Error>)
 }

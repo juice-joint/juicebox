@@ -9,7 +9,8 @@ import { VideoPlayer } from "./components/video-player";
 
 enum View {
   HOME = "home",
-  LOADING = "loading"
+  LOADING = "loading",
+  WAITING_FOR_WIFI = "waiting-for-wifi"
 }
 
 function App() {
@@ -27,6 +28,8 @@ function App() {
   switch (currentView) {
     case View.LOADING:
       return <Loading />;
+    case View.WAITING_FOR_WIFI:
+      return <WaitingForWiFi />;
     default:
       return <Home />;
   }
@@ -60,6 +63,29 @@ function Loading() {
         </div>
         
         <p className="text-white text-3xl font-medium">Loading...</p>
+      </div>
+    </div>
+  );
+}
+
+function WaitingForWiFi() {
+  return (
+    <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900">
+      <div className="text-center">
+        <div className="relative">
+          {/* WiFi icon animation */}
+          <div className="w-24 h-24 mx-auto mb-6 relative">
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div className="w-16 h-16 border-4 border-white/30 border-t-white rounded-full animate-pulse"></div>
+            </div>
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div className="text-white text-2xl">📶</div>
+            </div>
+          </div>
+        </div>
+        
+        <p className="text-white text-3xl font-medium mb-2">Waiting for WiFi...</p>
+        <p className="text-white/70 text-lg">Please connect to a WiFi network to continue</p>
       </div>
     </div>
   );

@@ -9,7 +9,13 @@ struct ServerIpResponse {
 }
 
 pub async fn server_ip() -> Result<impl IntoResponse, StatusCode> {
-    let my_local_ip = local_ip().unwrap();
+    let my_local_ip = match local_ip() {
+        Ok(ip) => ip,
+        Err(_) => {
+            debug!("Could not determine local IP address - likely no network connection");
+            return Err(StatusCode::SERVICE_UNAVAILABLE);
+        }
+    };
 
     debug!("my local ip {:?}", my_local_ip);
 

@@ -1,0 +1,23 @@
+[package]
+name = "wifi-handshake"
+version = "0.1.0"
+edition = "2024"
+
+[[bin]]
+name = "autoap"
+path = "src/main.rs"
+
+[dependencies]
+anyhow = "1.0"
+tokio = { version = "1.0", features = ["full"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+serde = { version = "1.0", features = ["derive"] }
+toml = "0.8"
+clap = { version = "4.0", features = ["derive"] }
+dialoguer = "0.11"
+regex = "1.0"
+
+[dev-dependencies]
+tempfile = "3.0"
+tokio-test = "0.4"

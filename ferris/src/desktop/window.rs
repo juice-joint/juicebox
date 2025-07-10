@@ -3,6 +3,7 @@ use tao::{
     event_loop::{ControlFlow, EventLoop, EventLoopProxy},
     window::{Fullscreen, WindowBuilder},
 };
+use tracing::{info, error};
 use wry::WebViewBuilder;
 
 pub enum AppEvent {
@@ -82,23 +83,23 @@ pub fn create_desktop_webview(
                 event: WindowEvent::CloseRequested,
                 ..
             } => {
-                tracing::info!("Window close requested");
+                info!("Window close requested");
                 *control_flow = ControlFlow::Exit;
             }
             Event::UserEvent(app_event) => match app_event {
                 AppEvent::LoadUrl(url) => {
-                    tracing::info!("Webview LoadUrl requested");
+                    info!("Webview LoadUrl requested");
                     match webview.load_url(&url) {
-                        Ok(_) => tracing::info!("Successfully loaded url {} in webview", url),
-                        Err(_) => tracing::error!("Error loading url {} in webview", url),
+                        Ok(_) => info!("Successfully loaded url {} in webview", url),
+                        Err(_) => error!("Error loading url {} in webview", url),
                     }
                 }
                 AppEvent::Hide => {
-                    tracing::info!("Window hide requested");
+                    info!("Window hide requested");
                     window.set_visible(false);
                 }
                 AppEvent::Show => {
-                    tracing::info!("Window show requested");
+                    info!("Window show requested");
                     window.set_visible(true);
                 }
             },

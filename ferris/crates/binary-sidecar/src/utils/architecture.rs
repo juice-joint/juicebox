@@ -2,6 +2,7 @@
 //! From: https://github.com/boul2gom/yt-dlp/blob/develop/src/utils/platform.rs
 
 use derive_more::Display;
+use tracing::debug;
 
 /// Represents the architecture of the CPU where the program is running.
 #[derive(Clone, Debug, Display)]
@@ -29,7 +30,7 @@ impl Architecture {
     pub fn detect() -> Self {
         let arch = std::env::consts::ARCH;
 
-        tracing::debug!("Detected architecture: {}", arch);
+        debug!("Detected architecture: {}", arch);
 
         match arch {
             "x86_64" => Architecture::X64,

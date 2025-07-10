@@ -2,6 +2,7 @@
 //! From: https://github.com/boul2gom/yt-dlp/blob/develop/src/utils/platform.rs
 
 use derive_more::Display;
+use tracing::debug;
 
 /// Represents the operating system where the program is running.
 #[derive(Clone, Debug, Display)]
@@ -26,7 +27,7 @@ impl Platform {
     pub fn detect() -> Self {
         let os = std::env::consts::OS;
 
-        tracing::debug!("Detected platform: {}", os);
+        debug!("Detected platform: {}", os);
 
         match os {
             "windows" => Platform::Windows,
