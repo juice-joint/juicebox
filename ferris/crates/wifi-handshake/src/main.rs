@@ -7,6 +7,7 @@ mod installer;
 mod runtime;
 mod utils;
 
+use config::AutoApConfig;
 use installer::Installer;
 use runtime::AutoAp;
 
@@ -66,6 +67,27 @@ async fn main() -> Result<()> {
     // Check if autoAP is already installed
     let is_installed = utils::is_autoap_installed().await;
     
+    // Handle the case where we're called by wpa_cli with raw arguments
+    // wpa_cli calls us like: autoap wlan0 AP-ENABLED [mac]
+    let raw_args: Vec<String> = std::env::args().collect();
+    
+    // If we have 3+ args and the second arg looks like an interface name and third looks like a state
+    if raw_args.len() >= 3 && 
+       raw_args[1].starts_with("wlan") && 
+       ["AP-ENABLED", "AP-DISABLED", "CONNECTED", "AP-STA-CONNECTED", "AP-STA-DISCONNECTED", "DISCONNECTED", "reset", "start"]
+           .contains(&raw_args[2].as_str()) {
+        
+        if !is_installed {
+            error!("autoAP is not installed but being called by wpa_cli");
+            std::process::exit(1);
+        }
+        
+        info!("Called by wpa_cli with args: {:?}", &raw_args[1..]);
+        let autoap = AutoAp::new().await?;
+        autoap.run(raw_args).await?;
+        return Ok(());
+    }
+
     match cli.command {
         Some(Commands::Install) => {
             info!("Starting autoAP installation...");

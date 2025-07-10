@@ -1,466 +1,385 @@
 use anyhow::{Context, Result};
-use dialoguer::{Confirm, Input};
-use tracing::{info, warn};
-
-use crate::config::{ApConfig, AutoApConfig, InstallConfig, WifiConfig};
-use crate::utils::{backup_file, is_systemd_networkd_active, make_executable, systemctl_command, write_file};
-
-pub struct Installer;
-
-impl Installer {
-    pub fn new() -> Self {
-        Self
-    }
-
-    pub async fn install(&self) -> Result<()> {
-        info!("Starting autoAP installation...");
-
-        // Check systemd-networkd
-        self.check_systemd_networkd().await?;
-
-        // Gather configuration
-        let config = self.gather_configuration().await?;
-
-        // Confirm installation
-        self.confirm_installation(&config).await?;
-
-        // Perform installation
-        self.perform_installation(&config).await?;
-
-        info!("autoAP installation completed successfully!");
-        info!("Please reboot the system for the configuration changes to take effect");
-
-        Ok(())
-    }
-
-    async fn check_systemd_networkd(&self) -> Result<()> {
-        info!("Checking systemd-networkd configuration...");
-        
-        if !is_systemd_networkd_active().await? {
-            warn!("systemd-networkd is not active");
-            warn!("autoAP requires systemd-networkd to manage network configurations");
-            
-            if Confirm::new()
-                .with_prompt("Would you like autoAP to enable and start systemd-networkd?")
-                .interact()?
-            {
-                info!("Enabling and starting systemd-networkd...");
-                systemctl_command(&["enable", "systemd-networkd"]).await
-                    .context("Failed to enable systemd-networkd")?;
-                systemctl_command(&["start", "systemd-networkd"]).await
-                    .context("Failed to start systemd-networkd")?;
-                
-                // Verify it's now running
-                if !is_systemd_networkd_active().await? {
-                    return Err(anyhow::anyhow!("Failed to start systemd-networkd"));
-                }
-                info!("systemd-networkd is now active");
-            } else {
-                warn!("You must switch to using systemd-networkd to use autoAP");
-                warn!("You can use /usr/local/bin/rpi-networkconfig to reconfigure your networking");
-                warn!("rpi-networkconfig will configure wlan0 and eth0 to be DHCP-enabled");
-                warn!("This can be done after install-autoAP has completed.");
-
-                if !Confirm::new()
-                    .with_prompt("Do you want to continue with autoAP installation anyway?")
-                    .interact()?
-                {
-                    return Err(anyhow::anyhow!("Installation cancelled by user"));
-                }
-            }
-        } else {
-            info!("systemd-networkd is active ✓");
-        }
-
-        Ok(())
-    }
-
-    async fn gather_configuration(&self) -> Result<InstallConfig> {
-        info!("Gathering configuration...");
-
-        // Try to get existing WiFi configuration
-        let existing_wifi = InstallConfig::parse_existing_wpa_config().await?;
-
-        let wifi_config = if let Some(mut wifi) = existing_wifi {
-            info!("Found existing WiFi configuration");
-            wifi.sanitize_strings();
-
-            // Ask if user wants to use existing config
-            if Confirm::new()
-                .with_prompt(format!(
-                    "Use existing WiFi config? (Country: {}, SSID: {})",
-                    wifi.country, wifi.ssid
-                ))
-                .interact()?
-            {
-                wifi
-            } else {
-                self.prompt_wifi_config().await?
-            }
-        } else {
-            info!("No existing WiFi configuration found");
-            self.prompt_wifi_config().await?
-        };
-
-        let ap_config = self.prompt_ap_config().await?;
-        let autoap_config = AutoApConfig::default();
-
-        Ok(InstallConfig {
-            wifi: wifi_config,
-            access_point: ap_config,
-            autoap: autoap_config,
-        })
-    }
-
-    async fn prompt_wifi_config(&self) -> Result<WifiConfig> {
-        let country: String = Input::new()
-            .with_prompt("Your Country")
-            .default("US".to_string())
-            .interact_text()?;
-
-        let ssid: String = Input::new()
-            .with_prompt("Your WiFi SSID")
-            .interact_text()?;
-
-        let psk: String = loop {
-            let password: String = Input::new()
-                .with_prompt("Your WiFi password")
-                .interact_text()?;
-            
-            let cleaned_password = password.replace('"', "");
-            if cleaned_password.len() < 8 || cleaned_password.len() > 63 {
-                warn!("WiFi password must be 8-63 characters long. You entered {} characters.", cleaned_password.len());
-                continue;
-            }
-            break cleaned_password;
-        };
-
-        let config = WifiConfig { country, ssid, psk };
-        Ok(config)
-    }
-
-    async fn prompt_ap_config(&self) -> Result<ApConfig> {
-        let ssid: String = Input::new()
-            .with_prompt("SSID for Access Point mode")
-            .interact_text()?;
-
-        let psk: String = loop {
-            let password: String = Input::new()
-                .with_prompt("Password for Access Point mode")
-                .interact_text()?;
-            
-            let cleaned_password = password.replace('"', "");
-            if cleaned_password.len() < 8 || cleaned_password.len() > 63 {
-                warn!("Access Point password must be 8-63 characters long. You entered {} characters.", cleaned_password.len());
-                continue;
-            }
-            break cleaned_password;
-        };
-
-        let ip_address: String = Input::new()
-            .with_prompt("IPv4 address for Access Point mode")
-            .default("192.168.16.1".to_string())
-            .interact_text()?;
-
-        let config = ApConfig { ssid, psk, ip_address };
-        Ok(config)
-    }
-
-    async fn confirm_installation(&self, config: &InstallConfig) -> Result<()> {
-        println!("\n        autoAP Configuration");
-        println!(" Access Point SSID:     {}", config.access_point.ssid);
-        println!(" Access Point password: {}", config.access_point.psk);
-        println!(" Access Point IP addr:  {}", config.access_point.ip_address);
-        println!(" Your WiFi country:     {}", config.wifi.country);
-        println!(" Your WiFi SSID:        {}", config.wifi.ssid);
-        println!(" Your WiFi password:    {}", config.wifi.psk);
-        println!();
-
-        if !Confirm::new()
-            .with_prompt("Are you ready to proceed?")
-            .interact()?
-        {
-            return Err(anyhow::anyhow!("Installation cancelled by user"));
-        }
-
-        Ok(())
-    }
-
-    async fn perform_installation(&self, config: &InstallConfig) -> Result<()> {
-        // Backup and create wpa_supplicant config
-        self.setup_wpa_supplicant(&config.wifi, &config.access_point).await?;
-
-        // Create systemd network files
-        self.setup_systemd_network(&config.access_point).await?;
-
-        // Create systemd service files
-        self.setup_systemd_services().await?;
-
-        // Create local script
-        self.setup_local_script().await?;
-
-        // Save autoAP configuration
-        config.autoap.save().await?;
-
-        // Configure services
-        self.configure_services().await?;
-
-        // Verify installation
-        self.verify_installation().await?;
-
-        Ok(())
-    }
-
-    async fn verify_installation(&self) -> Result<()> {
-        info!("Verifying installation...");
-
-        // Check that systemd-networkd is still running
-        if !is_systemd_networkd_active().await? {
-            warn!("systemd-networkd is not active after installation");
-            return Err(anyhow::anyhow!("systemd-networkd failed to start properly"));
-        }
-
-        // Check that required services are enabled
-        let services_to_check = [
-            "wpa_supplicant@wlan0",
-            "wpa-autoap@wlan0", 
-            "wpa-autoap-restore",
-            "systemd-networkd"
-        ];
-
-        for service in &services_to_check {
-            let output = std::process::Command::new("systemctl")
-                .args(["is-enabled", service])
-                .output()
-                .context("Failed to check service status")?;
-            
-            if !output.status.success() {
-                warn!("Service {} is not enabled", service);
-            } else {
-                info!("Service {} is enabled ✓", service);
-            }
-        }
-
-        // Test that our binary is accessible and working
-        let output = std::process::Command::new("/usr/local/bin/autoap")
-            .args(["--help"])
-            .output()
-            .context("Failed to test autoap binary")?;
-            
-        if !output.status.success() {
-            return Err(anyhow::anyhow!("autoap binary is not working properly"));
-        }
-
-        info!("Installation verification completed ✓");
-        Ok(())
-    }
-
-    async fn setup_wpa_supplicant(&self, wifi: &WifiConfig, ap: &ApConfig) -> Result<()> {
-        info!("Setting up wpa_supplicant configuration...");
-
-        // Find existing wpa_supplicant config
-        let original_config = if std::path::Path::new("/etc/wpa_supplicant/wpa_supplicant.conf").exists() {
-            "/etc/wpa_supplicant/wpa_supplicant.conf"
-        } else {
-            "/etc/wpa_supplicant/wpa_supplicant-wlan0.conf"
-        };
-
-        // Backup original config
-        if std::path::Path::new(original_config).exists() {
-            let backup_path = format!("{}-orig", original_config);
-            backup_file(original_config).await?;
-            
-            // Move original to -orig
-            tokio::fs::rename(original_config, &backup_path).await
-                .context("Failed to backup original wpa_supplicant config")?;
-            
-            info!("Renamed {} to {}", original_config, backup_path);
-        }
-
-        // Create new wpa_supplicant-wlan0.conf
-        let wpa_config = format!(
-            r#"country={}
-ctrl_interface=DIR=/var/run/wpa_supplicant GROUP=netdev
-update_config=1
-ap_scan=1
-
-network={{
-    priority=10
-    ssid="{}"
-    psk="{}"
-}}
-
-### autoAP access point ###
-network={{
-    ssid="{}"
-    mode=2
-    key_mgmt=WPA-PSK
-    psk="{}"
-    frequency=2462
-}}
-"#,
-            wifi.country, 
-            wifi.ssid.replace('"', ""), 
-            wifi.psk.replace('"', ""), 
-            ap.ssid.replace('"', ""), 
-            ap.psk.replace('"', "")
-        );
-
-        write_file("/etc/wpa_supplicant/wpa_supplicant-wlan0.conf", &wpa_config).await?;
-        info!("Created /etc/wpa_supplicant/wpa_supplicant-wlan0.conf");
-
-        Ok(())
-    }
-
-    async fn setup_systemd_network(&self, ap: &ApConfig) -> Result<()> {
-        info!("Creating WiFi network files in /etc/systemd/network...");
-
-        // Backup existing files
-        backup_file("/etc/systemd/network/11-wlan0.network").await?;
-        backup_file("/etc/systemd/network/12-wlan0AP.network").await?;
-
-        // Remove any existing backup file that autoAP creates
-        if std::path::Path::new("/etc/systemd/network/11-wlan0.network~").exists() {
-            tokio::fs::remove_file("/etc/systemd/network/11-wlan0.network~").await?;
-        }
-
-        // Create client network config
-        let client_config = r#"[Match]
-Name=wlan0
-
-[Network]
-DHCP=ipv4
-
-[DHCP]
-RouteMetric=20
-UseDomains=yes
-
-"#;
-        write_file("/etc/systemd/network/11-wlan0.network", client_config).await?;
-
-        // Create AP network config
-        let ap_config_content = format!(
-            r#"[Match]
-Name=wlan0
-
-[Network]
-DHCPServer=yes
-Address={}/24
-
-"#,
-            ap.ip_address
-        );
-        write_file("/etc/systemd/network/12-wlan0AP.network", &ap_config_content).await?;
-
-        info!("Created systemd network configuration files");
-        Ok(())
-    }
-
-    async fn setup_systemd_services(&self) -> Result<()> {
-        info!("Creating systemd service files...");
-
-        // Backup existing service files
-        backup_file("/etc/systemd/system/wpa-autoap@wlan0.service").await?;
-        backup_file("/etc/systemd/system/wpa-autoap-restore.service").await?;
-
-        // Create wpa-autoap@wlan0.service
-        let autoap_service = r#"[Unit]
-Description=autoAP Automatic Access Point When No WiFi Connection (wpa-autoap@wlan0.service)
-#After=network.target network-online.target wpa_supplicant@%i.service sys-subsystem-net-devices-%i.device
-Before=wpa_supplicant@%i.service
-BindsTo=wpa_supplicant@%i.service
-
-[Service]
-Type=simple
-ExecStart=/usr/local/bin/autoap start %I
-Restart=on-failure
-TimeoutSec=1
-
-[Install]
-WantedBy=multi-user.target
-
-"#;
-        write_file("/etc/systemd/system/wpa-autoap@wlan0.service", autoap_service).await?;
-
-        // Create wpa-autoap-restore.service
-        let restore_service = r#"[Unit]
-Description=Restore wpa-autoap configuration (wpa-autoap-restore.service)
-DefaultDependencies=no
-After=local-fs-pre.target
-
-[Service]
-Type=oneshot
-ExecStart=/bin/bash -c '[ -x /usr/local/bin/autoap ] && /usr/local/bin/autoap reset'
-
-[Install]
-WantedBy=multi-user.target
-
-"#;
-        write_file("/etc/systemd/system/wpa-autoap-restore.service", restore_service).await?;
-
-        info!("Created systemd service files");
-        Ok(())
-    }
-
-    async fn setup_local_script(&self) -> Result<()> {
-        info!("Creating /usr/local/bin/autoAP-local.sh...");
-
-        backup_file("/usr/local/bin/autoAP-local.sh").await?;
-
-        let local_script = r#"#!/bin/bash
-# $1 has either "Client" or "AccessPoint"
-
-logmsg () {
-    [ $debug -eq 0 ] && logger --id=$$ "$1"
+use std::path::Path;
+use tokio::fs;
+use tokio::time::{sleep, Duration};
+use tracing::{debug, error, info, warn};
+
+use crate::config::AutoApConfig;
+use crate::utils::{has_connected_stations, is_station_mode, systemctl_command, wpa_cli_command};
+
+#[derive(Debug, Clone)]
+pub enum WifiState {
+    ApEnabled,
+    ApDisabled,
+    Connected,
+    ApStaConnected,
+    ApStaDisconnected,
+    Disconnected,
 }
 
-[ -f /usr/local/bin/autoAP.conf ] && source /usr/local/bin/autoAP.conf || debug=0
+impl std::str::FromStr for WifiState {
+    type Err = anyhow::Error;
 
-case "$1" in
-    Client)
-          logmsg "/usr/local/bin/autoAP-local: Client"
-	  ## Add your code here that runs when the Client WiFi is enabled
-	  ;;
-    AccessPoint)
-          logmsg "/usr/local/bin/autoAP-local: Access Point"
-	  ## Add your code here that runs when the Access Point is enabled
-	  ;;
-esac
-"#;
+    fn from_str(s: &str) -> Result<Self> {
+        match s {
+            "AP-ENABLED" => Ok(WifiState::ApEnabled),
+            "AP-DISABLED" => Ok(WifiState::ApDisabled),
+            "CONNECTED" => Ok(WifiState::Connected),
+            "AP-STA-CONNECTED" => Ok(WifiState::ApStaConnected),
+            "AP-STA-DISCONNECTED" => Ok(WifiState::ApStaDisconnected),
+            "DISCONNECTED" => Ok(WifiState::Disconnected),
+            _ => Err(anyhow::anyhow!("Unrecognized WiFi state: {}", s)),
+        }
+    }
+}
 
-        write_file("/usr/local/bin/autoAP-local.sh", local_script).await?;
-        make_executable("/usr/local/bin/autoAP-local.sh").await?;
+pub struct AutoAp {
+    config: AutoApConfig,
+}
 
-        info!("Created local script");
+impl AutoAp {
+    pub async fn new() -> Result<Self> {
+        let config = AutoApConfig::load().await?;
+        Ok(Self { config })
+    }
+
+    pub async fn run(&self, args: Vec<String>) -> Result<()> {
+        if args.len() < 2 {
+            return Err(anyhow::anyhow!("Insufficient arguments"));
+        }
+
+        // Handle special cases first
+        if args[1] == "reset" {
+            info!("Performing reset operation");
+            self.reset().await?;
+            return Ok(());
+        }
+        
+        if args[1] == "start" {
+            if args.len() < 3 {
+                return Err(anyhow::anyhow!("Start command requires device name"));
+            }
+            let device = &args[2];
+            info!("Starting autoAP for device: {}", device);
+            self.start(device).await?;
+            return Ok(());
+        }
+
+        // Normal state change handling: autoap wlan0 STATE [mac]
+        if args.len() < 3 {
+            return Err(anyhow::anyhow!("State change requires device and state"));
+        }
+        
+        let device = &args[1];
+        let state_str = &args[2];
+        let mac_address = args.get(3).map(|s| s.as_str());
+        
+        let state: WifiState = state_str.parse()
+            .context("Failed to parse WiFi state")?;
+        
+        info!("autoAP {} state {:?} {:?}", device, state, mac_address);
+        self.handle_state_change(device, state, mac_address).await?;
+
         Ok(())
     }
 
-    async fn configure_services(&self) -> Result<()> {
-        info!("Configuring systemd services...");
+    async fn handle_state_change(
+        &self,
+        device: &str,
+        state: WifiState,
+        mac_address: Option<&str>,
+    ) -> Result<()> {
+        self.log_flags().await;
 
-        // Reload systemd daemon
-        systemctl_command(&["daemon-reload"]).await?;
+        match state {
+            WifiState::ApEnabled => {
+                info!("AP enabled, configuring access point");
+                self.configure_ap(device).await?;
+                
+                // Start reconfigure task in background
+                let device = device.to_string();
+                let enable_wait = self.config.enable_wait;
+                tokio::spawn(async move {
+                    if let Err(e) = Self::reconfigure_wpa_supplicant_static(&device, enable_wait).await {
+                        error!("Failed to reconfigure wpa_supplicant: {}", e);
+                    }
+                });
+            }
+            WifiState::ApDisabled => {
+                info!("AP disabled");
+                // No specific action needed in original script
+            }
+            WifiState::Connected => {
+                info!("Connected to network");
+                if is_station_mode(device).await? {
+                    info!("CONNECTED in station mode, configuring client");
+                    self.configure_client(device).await?;
+                }
+            }
+            WifiState::ApStaDisconnected => {
+                if let Some(mac) = mac_address {
+                    info!("Station {} disconnected from autoAP", mac);
+                } else {
+                    info!("Station disconnected from autoAP");
+                }
+                
+                // Start reconfigure task in background
+                let device = device.to_string();
+                let disconnect_wait = self.config.disconnect_wait;
+                tokio::spawn(async move {
+                    if let Err(e) = Self::reconfigure_wpa_supplicant_static(&device, disconnect_wait).await {
+                        error!("Failed to reconfigure wpa_supplicant: {}", e);
+                    }
+                });
+            }
+            WifiState::ApStaConnected => {
+                if let Some(mac) = mac_address {
+                    info!("Station {} connected to autoAP", mac);
+                } else {
+                    info!("Station connected to autoAP");
+                }
+                
+                // Cancel any waiting reconfigure since someone connected
+                if let Err(e) = self.touch_unlock_file().await {
+                    warn!("Failed to create unlock file: {}", e);
+                }
+            }
+            WifiState::Disconnected => {
+                info!("Disconnected from network");
+                if self.is_client(device).await? {
+                    info!("Client disconnected, configuring as AP");
+                    self.configure_ap(device).await?;
+                }
+            }
+        }
 
-        // Enable wpa_supplicant@wlan0
-        info!("Enabling wpa_supplicant@wlan0...");
-        systemctl_command(&["enable", "wpa_supplicant@wlan0"]).await?;
+        Ok(())
+    }
 
-        // Disable vanilla wpa_supplicant
-        info!("Disabling (vanilla) wpa_supplicant...");
-        systemctl_command(&["disable", "wpa_supplicant"]).await
-            .unwrap_or_else(|e| {
-                warn!("Failed to disable wpa_supplicant (may not be enabled): {}", e);
-            });
+    async fn log_flags(&self) {
+        if !self.config.debug {
+            return;
+        }
 
-        // Enable wpa-autoap@wlan0
-        info!("Enabling wpa-autoap@wlan0 service...");
-        systemctl_command(&["enable", "wpa-autoap@wlan0"]).await?;
+        let lock_status = if Path::new("/var/run/autoAP.locked").exists() {
+            match fs::metadata("/var/run/autoAP.locked").await {
+                Ok(metadata) => format!("Found: {:?}", metadata.modified()),
+                Err(e) => format!("Error reading: {}", e),
+            }
+        } else {
+            "Not found".to_string()
+        };
 
-        // Enable wpa-autoap-restore
-        info!("Enabling wpa-autoap-restore service...");
-        systemctl_command(&["enable", "wpa-autoap-restore"]).await?;
+        let unlock_status = if Path::new("/var/run/autoAP.unlock").exists() {
+            match fs::metadata("/var/run/autoAP.unlock").await {
+                Ok(metadata) => format!("Found: {:?}", metadata.modified()),
+                Err(e) => format!("Error reading: {}", e),
+            }
+        } else {
+            "Not found".to_string()
+        };
 
-        info!("Service configuration completed");
+        debug!("autoAP: Lock status 1: {}", lock_status);
+        debug!("autoAP: Lock status 2: {}", unlock_status);
+    }
+
+    async fn is_client(&self, device: &str) -> Result<bool> {
+        let network_file = format!("/etc/systemd/network/11-{}.network", device);
+        Ok(Path::new(&network_file).exists())
+    }
+
+    async fn configure_ap(&self, device: &str) -> Result<()> {
+        let network_file = format!("/etc/systemd/network/11-{}.network", device);
+        let backup_file = format!("/etc/systemd/network/11-{}.network~", device);
+
+        if Path::new(&network_file).exists() {
+            info!("Configuring {} as an Access Point", device);
+            
+            fs::rename(&network_file, &backup_file).await
+                .context("Failed to backup network file")?;
+
+            self.restart_systemd_networkd().await?;
+            self.run_local_script("AccessPoint").await?;
+        }
+
+        Ok(())
+    }
+
+    async fn configure_client(&self, device: &str) -> Result<()> {
+        let network_file = format!("/etc/systemd/network/11-{}.network", device);
+        let backup_file = format!("/etc/systemd/network/11-{}.network~", device);
+
+        if Path::new(&backup_file).exists() {
+            info!("Configuring {} as a Wireless Client", device);
+            
+            fs::rename(&backup_file, &network_file).await
+                .context("Failed to restore network file")?;
+
+            self.restart_systemd_networkd().await?;
+            self.run_local_script("Client").await?;
+        }
+
+        Ok(())
+    }
+
+    async fn restart_systemd_networkd(&self) -> Result<()> {
+        // Check if systemd-networkd is enabled/running first
+        if !crate::utils::is_systemd_networkd_active().await? {
+            warn!("systemd-networkd is not active, attempting to start it");
+            systemctl_command(&["start", "systemd-networkd"]).await
+                .context("Failed to start systemd-networkd")?;
+            
+            // Give it a moment to start
+            tokio::time::sleep(Duration::from_millis(500)).await;
+        }
+        
+        systemctl_command(&["restart", "systemd-networkd"]).await
+    }
+
+    async fn run_local_script(&self, mode: &str) -> Result<()> {
+        let script_path = "/usr/local/bin/autoAP-local.sh";
+        
+        if !Path::new(script_path).exists() {
+            return Ok(()); // Script doesn't exist, which is fine
+        }
+
+        // Check if executable
+        if !crate::utils::is_executable(script_path).await {
+            return Ok(()); // Not executable
+        }
+
+        let output = tokio::process::Command::new(script_path)
+            .arg(mode)
+            .output()
+            .await
+            .context("Failed to run local script")?;
+
+        if !output.status.success() {
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            warn!("Local script failed: {}", stderr);
+        }
+
+        Ok(())
+    }
+
+    // Static version for use in spawned tasks
+    async fn reconfigure_wpa_supplicant_static(device: &str, wait_seconds: u64) -> Result<()> {
+        let lock_file = "/var/run/autoAP.locked";
+        let unlock_file = "/var/run/autoAP.unlock";
+
+        if Path::new(lock_file).exists() {
+            info!("Reconfigure already locked. Unlocking...");
+            fs::File::create(unlock_file).await
+                .context("Failed to create unlock file")?;
+            return Ok(());
+        }
+
+        // Create lock file
+        fs::File::create(lock_file).await
+            .context("Failed to create lock file")?;
+        
+        // Remove unlock file if it exists
+        if Path::new(unlock_file).exists() {
+            fs::remove_file(unlock_file).await
+                .context("Failed to remove unlock file")?;
+        }
+
+        info!("Starting reconfigure wait loop for {} seconds", wait_seconds);
+
+        for _i in 0..=wait_seconds {
+            sleep(Duration::from_secs(1)).await;
+            
+            if Path::new(unlock_file).exists() {
+                info!("Reconfigure wait unlocked");
+                let _ = fs::remove_file(unlock_file).await;
+                let _ = fs::remove_file(lock_file).await;
+                return Ok(());
+            }
+        }
+
+        // Completed loop, check for reconfigure
+        let _ = fs::remove_file(unlock_file).await;
+        let _ = fs::remove_file(lock_file).await;
+
+        info!("Checking wpa reconfigure after wait loop");
+        
+        // Check if any stations are connected
+        if !has_connected_stations(device).await.unwrap_or(true) {
+            info!("No stations connected; performing wpa reconfigure");
+            if let Err(e) = wpa_cli_command(device, &["reconfigure"]).await {
+                error!("wpa_cli reconfigure failed: {}", e);
+            }
+        }
+
+        Ok(())
+    }
+
+    async fn touch_unlock_file(&self) -> Result<()> {
+        fs::File::create("/var/run/autoAP.unlock").await
+            .context("Failed to create unlock file")?;
+        Ok(())
+    }
+
+    pub async fn reset(&self) -> Result<()> {
+        let lock_file = "/var/run/autoAP.locked";
+        let unlock_file = "/var/run/autoAP.unlock";
+        let backup_network = "/etc/systemd/network/11-wlan0.network~";
+        let network_file = "/etc/systemd/network/11-wlan0.network";
+
+        // Remove lock files
+        if Path::new(lock_file).exists() {
+            fs::remove_file(lock_file).await
+                .context("Failed to remove lock file")?;
+        }
+
+        if Path::new(unlock_file).exists() {
+            fs::remove_file(unlock_file).await
+                .context("Failed to remove unlock file")?;
+        }
+
+        // Restore network file if backup exists
+        if Path::new(backup_network).exists() {
+            fs::rename(backup_network, network_file).await
+                .context("Failed to restore network file")?;
+        }
+
+        Ok(())
+    }
+
+    pub async fn start(&self, device: &str) -> Result<()> {
+        self.reset().await?;
+
+        let wpa_socket_path = format!("/var/run/wpa_supplicant/{}", device);
+        
+        // Wait for wpa_supplicant to come online
+        while !Path::new(&wpa_socket_path).exists() {
+            info!("Waiting for wpa_supplicant to come online");
+            sleep(Duration::from_millis(500)).await;
+        }
+
+        info!("wpa_supplicant online, starting wpa_cli to monitor wpa_supplicant messages");
+        
+        // Get the current binary path
+        let current_exe = std::env::current_exe()
+            .context("Failed to get current executable path")?;
+        
+        // In the original script, this would exec wpa_cli
+        // We'll spawn wpa_cli and have it call back to our binary
+        let mut child = tokio::process::Command::new("/sbin/wpa_cli")
+            .args(["-i", device, "-a", current_exe.to_str().unwrap()])
+            .spawn()
+            .context("Failed to spawn wpa_cli")?;
+
+        info!("wpa_cli spawned with PID: {}", child.id().unwrap_or(0));
+        
+        // Wait for the child process
+        let status = child.wait().await
+            .context("Failed to wait for wpa_cli")?;
+            
+        if !status.success() {
+            return Err(anyhow::anyhow!("wpa_cli exited with error: {}", status));
+        }
+        
         Ok(())
     }
 }
