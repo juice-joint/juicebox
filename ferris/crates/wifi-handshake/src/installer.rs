@@ -99,12 +99,20 @@ impl Installer {
             .with_prompt("Your WiFi SSID")
             .interact_text()?;
 
-        let psk: String = Input::new()
-            .with_prompt("Your WiFi password")
-            .interact_text()?;
+        let psk: String = loop {
+            let password: String = Input::new()
+                .with_prompt("Your WiFi password")
+                .interact_text()?;
+            
+            let cleaned_password = password.replace('"', "");
+            if cleaned_password.len() < 8 || cleaned_password.len() > 63 {
+                warn!("WiFi password must be 8-63 characters long. You entered {} characters.", cleaned_password.len());
+                continue;
+            }
+            break cleaned_password;
+        };
 
-        let mut config = WifiConfig { country, ssid, psk };
-        config.sanitize_strings();
+        let config = WifiConfig { country, ssid, psk };
         Ok(config)
     }
 
@@ -113,17 +121,25 @@ impl Installer {
             .with_prompt("SSID for Access Point mode")
             .interact_text()?;
 
-        let psk: String = Input::new()
-            .with_prompt("Password for Access Point mode")
-            .interact_text()?;
+        let psk: String = loop {
+            let password: String = Input::new()
+                .with_prompt("Password for Access Point mode")
+                .interact_text()?;
+            
+            let cleaned_password = password.replace('"', "");
+            if cleaned_password.len() < 8 || cleaned_password.len() > 63 {
+                warn!("Access Point password must be 8-63 characters long. You entered {} characters.", cleaned_password.len());
+                continue;
+            }
+            break cleaned_password;
+        };
 
         let ip_address: String = Input::new()
             .with_prompt("IPv4 address for Access Point mode")
             .default("192.168.16.1".to_string())
             .interact_text()?;
 
-        let mut config = ApConfig { ssid, psk, ip_address };
-        config.sanitize_strings();
+        let config = ApConfig { ssid, psk, ip_address };
         Ok(config)
     }
 
@@ -213,7 +229,11 @@ network={{
     frequency=2462
 }}
 "#,
-            wifi.country, wifi.ssid, wifi.psk, ap.ssid, ap.psk
+            wifi.country, 
+            wifi.ssid.replace('"', ""), 
+            wifi.psk.replace('"', ""), 
+            ap.ssid.replace('"', ""), 
+            ap.psk.replace('"', "")
         );
 
         write_file("/etc/wpa_supplicant/wpa_supplicant-wlan0.conf", &wpa_config).await?;
