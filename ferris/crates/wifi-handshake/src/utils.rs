@@ -46,6 +46,17 @@ pub async fn is_systemd_networkd_active() -> Result<bool> {
        String::from_utf8_lossy(&output.stdout).trim() == "active")
 }
 
+/// Check if systemd-resolved is active
+pub async fn is_systemd_resolved_active() -> Result<bool> {
+    let output = Command::new("systemctl")
+        .args(["is-active", "systemd-resolved"])
+        .output()
+        .context("Failed to check systemd-resolved status")?;
+
+    Ok(output.status.success() && 
+       String::from_utf8_lossy(&output.stdout).trim() == "active")
+}
+
 /// Run a systemctl command
 pub async fn systemctl_command(args: &[&str]) -> Result<()> {
     let output = Command::new("systemctl")

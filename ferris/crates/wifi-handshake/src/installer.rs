@@ -3,7 +3,7 @@ use dialoguer::{Confirm, Input};
 use tracing::{info, warn};
 
 use crate::config::{ApConfig, AutoApConfig, InstallConfig, WifiConfig};
-use crate::utils::{backup_file, is_systemd_networkd_active, make_executable, systemctl_command, write_file};
+use crate::utils::{backup_file, is_systemd_networkd_active, is_systemd_resolved_active, make_executable, systemctl_command, write_file};
 
 pub struct Installer;
 
@@ -221,13 +221,7 @@ impl Installer {
         }
 
         // Check systemd-resolved if it should be running
-        let resolved_active = std::process::Command::new("systemctl")
-            .args(["is-active", "systemd-resolved"])
-            .output()
-            .map(|o| o.status.success())
-            .unwrap_or(false);
-        
-        if resolved_active {
+        if is_systemd_resolved_active().await.unwrap_or(false) {
             info!("systemd-resolved is active ✓");
         }
 
