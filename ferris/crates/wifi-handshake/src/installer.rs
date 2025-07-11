@@ -48,6 +48,29 @@ impl Installer {
     async fn check_and_enable_service(&self, service_name: &str, description: &str) -> Result<()> {
         info!("Checking {} configuration...", service_name);
         
+        // First check if the service exists
+        if !self.service_exists(service_name).await? {
+            warn!("{} service does not exist on this system", service_name);
+            
+            if service_name == "systemd-resolved" {
+                if Confirm::new()
+                    .with_prompt("systemd-resolved is not installed. Would you like autoAP to install it?")
+                    .interact()?
+                {
+                    self.install_systemd_resolved().await?;
+                } else {
+                    return Err(anyhow::anyhow!(
+                        "Installation cancelled: systemd-resolved is required for autoAP to function properly"
+                    ));
+                }
+            } else {
+                return Err(anyhow::anyhow!(
+                    "{} service does not exist and cannot be automatically installed", 
+                    service_name
+                ));
+            }
+        }
+        
         let is_active = match service_name {
             "systemd-networkd" => is_systemd_networkd_active().await?,
             "systemd-resolved" => is_systemd_resolved_active().await?,
@@ -90,6 +113,96 @@ impl Installer {
         }
 
         Ok(())
+    }
+
+    async fn service_exists(&self, service_name: &str) -> Result<bool> {
+        let output = std::process::Command::new("systemctl")
+            .args(["cat", service_name])
+            .output()
+            .context("Failed to check if service exists")?;
+        
+        Ok(output.status.success())
+    }
+
+    async fn install_systemd_resolved(&self) -> Result<()> {
+        info!("Installing systemd-resolved...");
+        
+        // Detect package manager and install systemd-resolved
+        if self.command_exists("apt").await? {
+            info!("Using apt to install systemd-resolved...");
+            let output = std::process::Command::new("apt")
+                .args(["update"])
+                .output()
+                .context("Failed to update package list")?;
+            
+            if !output.status.success() {
+                warn!("apt update failed, continuing with installation attempt...");
+            }
+            
+            let output = std::process::Command::new("apt")
+                .args(["install", "-y", "systemd-resolved"])
+                .output()
+                .context("Failed to install systemd-resolved with apt")?;
+            
+            if !output.status.success() {
+                let stderr = String::from_utf8_lossy(&output.stderr);
+                return Err(anyhow::anyhow!("Failed to install systemd-resolved: {}", stderr));
+            }
+        } else if self.command_exists("dnf").await? {
+            info!("Using dnf to install systemd-resolved...");
+            let output = std::process::Command::new("dnf")
+                .args(["install", "-y", "systemd-resolved"])
+                .output()
+                .context("Failed to install systemd-resolved with dnf")?;
+            
+            if !output.status.success() {
+                let stderr = String::from_utf8_lossy(&output.stderr);
+                return Err(anyhow::anyhow!("Failed to install systemd-resolved: {}", stderr));
+            }
+        } else if self.command_exists("yum").await? {
+            info!("Using yum to install systemd-resolved...");
+            let output = std::process::Command::new("yum")
+                .args(["install", "-y", "systemd-resolved"])
+                .output()
+                .context("Failed to install systemd-resolved with yum")?;
+            
+            if !output.status.success() {
+                let stderr = String::from_utf8_lossy(&output.stderr);
+                return Err(anyhow::anyhow!("Failed to install systemd-resolved: {}", stderr));
+            }
+        } else if self.command_exists("pacman").await? {
+            info!("Using pacman to install systemd-resolved...");
+            let output = std::process::Command::new("pacman")
+                .args(["-S", "--noconfirm", "systemd-resolvconf"])
+                .output()
+                .context("Failed to install systemd-resolved with pacman")?;
+            
+            if !output.status.success() {
+                let stderr = String::from_utf8_lossy(&output.stderr);
+                return Err(anyhow::anyhow!("Failed to install systemd-resolved: {}", stderr));
+            }
+        } else {
+            return Err(anyhow::anyhow!(
+                "No supported package manager found (apt, dnf, yum, pacman). Please install systemd-resolved manually."
+            ));
+        }
+        
+        info!("systemd-resolved installed successfully");
+        
+        // Reload systemd to pick up the new service
+        systemctl_command(&["daemon-reload"]).await
+            .context("Failed to reload systemd after installing systemd-resolved")?;
+        
+        Ok(())
+    }
+
+    async fn command_exists(&self, command: &str) -> Result<bool> {
+        let output = std::process::Command::new("which")
+            .arg(command)
+            .output()
+            .context("Failed to check if command exists")?;
+        
+        Ok(output.status.success())
     }
 
     async fn gather_configuration(&self) -> Result<InstallConfig> {
