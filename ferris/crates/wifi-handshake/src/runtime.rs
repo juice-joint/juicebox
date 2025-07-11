@@ -281,10 +281,25 @@ impl AutoAp {
 
             self.restart_systemd_networkd().await?;
             
-            // Force wpa_supplicant to reconfigure and switch to AP mode
+            // Wait for systemd-networkd to settle before reconfiguring wpa_supplicant
+            info!("Waiting for systemd-networkd to settle...");
+            tokio::time::sleep(Duration::from_secs(2)).await;
+            
+            // Force wpa_supplicant to reconfigure and switch to AP mode with retries
             info!("Forcing wpa_supplicant to reconfigure for AP mode");
-            if let Err(e) = wpa_cli_command(device, &["reconfigure"]).await {
-                warn!("wpa_cli reconfigure failed: {}", e);
+            for attempt in 1..=3 {
+                match wpa_cli_command(device, &["reconfigure"]).await {
+                    Ok(_) => {
+                        info!("wpa_cli reconfigure succeeded on attempt {}", attempt);
+                        break;
+                    }
+                    Err(e) => {
+                        warn!("wpa_cli reconfigure failed on attempt {}: {}", attempt, e);
+                        if attempt < 3 {
+                            tokio::time::sleep(Duration::from_secs(1)).await;
+                        }
+                    }
+                }
             }
             
             // Call Rust function directly instead of bash script
