@@ -281,6 +281,12 @@ impl AutoAp {
 
             self.restart_systemd_networkd().await?;
             
+            // Force wpa_supplicant to reconfigure and switch to AP mode
+            info!("Forcing wpa_supplicant to reconfigure for AP mode");
+            if let Err(e) = wpa_cli_command(device, &["reconfigure"]).await {
+                warn!("wpa_cli reconfigure failed: {}", e);
+            }
+            
             // Call Rust function directly instead of bash script
             if let Err(e) = self.on_access_point_mode(device).await {
                 warn!("Access Point mode hook failed: {}", e);
