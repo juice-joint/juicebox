@@ -116,41 +116,6 @@ pub async fn write_file(path: &str, content: &str) -> Result<()> {
     Ok(())
 }
 
-/// Check if a file is executable
-pub async fn is_executable(path: &str) -> bool {
-    match fs::metadata(path).await {
-        Ok(metadata) => {
-            #[cfg(unix)]
-            {
-                use std::os::unix::fs::PermissionsExt;
-                metadata.permissions().mode() & 0o111 != 0
-            }
-            #[cfg(not(unix))]
-            {
-                true // Assume executable on non-Unix systems
-            }
-        }
-        Err(_) => false,
-    }
-}
-
-/// Make a file executable
-pub async fn make_executable(path: &str) -> Result<()> {
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::PermissionsExt;
-        let metadata = fs::metadata(path).await
-            .context("Failed to get file metadata")?;
-        let mut permissions = metadata.permissions();
-        permissions.set_mode(permissions.mode() | 0o755);
-        fs::set_permissions(path, permissions).await
-            .context("Failed to set file permissions")?;
-    }
-    
-    debug!("Made file executable: {}", path);
-    Ok(())
-}
-
 /// Run wpa_cli command and return output
 pub async fn wpa_cli_command(interface: &str, args: &[&str]) -> Result<String> {
     let mut cmd_args = vec!["-i", interface];

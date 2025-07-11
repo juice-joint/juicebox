@@ -3,7 +3,7 @@ use dialoguer::{Confirm, Input};
 use tracing::{info, warn};
 
 use crate::config::{ApConfig, AutoApConfig, InstallConfig, WifiConfig};
-use crate::utils::{backup_file, is_systemd_networkd_active, is_systemd_resolved_active, make_executable, systemctl_command, write_file};
+use crate::utils::{backup_file, is_systemd_networkd_active, is_systemd_resolved_active, systemctl_command, write_file};
 
 pub struct Installer;
 
