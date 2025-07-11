@@ -3,7 +3,7 @@ use dialoguer::{Confirm, Input};
 use tracing::{info, warn};
 
 use crate::config::{ApConfig, AutoApConfig, InstallConfig, WifiConfig};
-use crate::utils::{backup_file, is_systemd_networkd_active, is_systemd_resolved_active, make_executable, systemctl_command, write_file};
+use crate::utils::{backup_file, is_systemd_networkd_active, is_systemd_resolved_active, systemctl_command, write_file};
 
 pub struct Installer;
 
@@ -407,9 +407,6 @@ unmanaged-devices=interface-name:wlan0
         // Create systemd service files
         self.setup_systemd_services().await?;
 
-        // Create local script
-        self.setup_local_script().await?;
-
         // Save autoAP configuration
         config.autoap.save().await?;
 
@@ -531,9 +528,10 @@ network={{
     }
 
     async fn setup_systemd_network(&self, ap: &ApConfig) -> Result<()> {
-        info!("Creating WiFi network files in /etc/systemd/network...");
+        info!("Creating network files in /etc/systemd/network...");
 
         // Backup existing files
+        backup_file("/etc/systemd/network/10-eth0.network").await?;
         backup_file("/etc/systemd/network/11-wlan0.network").await?;
         backup_file("/etc/systemd/network/12-wlan0AP.network").await?;
 
@@ -542,7 +540,22 @@ network={{
             tokio::fs::remove_file("/etc/systemd/network/11-wlan0.network~").await?;
         }
 
-        // Create client network config
+        // Create ethernet network config
+        let ethernet_config = r#"[Match]
+Name=eth0
+
+[Network]
+DHCP=ipv4
+
+[DHCP]
+RouteMetric=10
+UseDomains=yes
+UseDNS=yes
+
+"#;
+        write_file("/etc/systemd/network/10-eth0.network", ethernet_config).await?;
+
+        // Create WiFi client network config
         let client_config = r#"[Match]
 Name=wlan0
 
@@ -571,7 +584,7 @@ Address={}/24
         );
         write_file("/etc/systemd/network/12-wlan0AP.network", &ap_config_content).await?;
 
-        info!("Created systemd network configuration files");
+        info!("Created systemd network configuration files (eth0, wlan0 client, wlan0 AP)");
         Ok(())
     }
 
@@ -618,12 +631,6 @@ WantedBy=multi-user.target
         write_file("/etc/systemd/system/wpa-autoap-restore.service", restore_service).await?;
 
         info!("Created systemd service files");
-        Ok(())
-    }
-
-    async fn setup_local_script(&self) -> Result<()> {
-        // No longer needed - using direct Rust function calls instead of bash script
-        info!("Skipping local script creation - using direct Rust function calls");
         Ok(())
     }
 
