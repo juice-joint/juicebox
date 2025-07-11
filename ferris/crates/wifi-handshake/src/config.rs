@@ -1,7 +1,7 @@
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
+use std::fs;
 use std::path::Path;
-use tokio::fs;
 use tracing::{info, warn};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -25,28 +25,14 @@ impl Default for AutoApConfig {
 }
 
 #[derive(Debug, Clone)]
-pub struct WifiConfig {
-    pub country: String,
-    pub ssid: String,
-    pub psk: String,
-}
-
-#[derive(Debug, Clone)]
 pub struct ApConfig {
     pub ssid: String,
     pub psk: String,
     pub ip_address: String,
 }
 
-#[derive(Debug, Clone)]
-pub struct InstallConfig {
-    pub wifi: WifiConfig,
-    pub access_point: ApConfig,
-    pub autoap: AutoApConfig,
-}
-
 impl AutoApConfig {
-    pub async fn load() -> Result<Self> {
+    pub fn load() -> Result<Self> {
         let config_path = "/usr/local/bin/autoAP.conf";
         
         if !Path::new(config_path).exists() {
@@ -54,14 +40,14 @@ impl AutoApConfig {
             return Ok(Self::default());
         }
 
-        let content = fs::read_to_string(config_path).await
+        let content = fs::read_to_string(config_path)
             .context("Failed to read autoAP config file")?;
 
         // Parse the bash-style config file
         Self::parse_bash_config(&content)
     }
 
-    pub async fn save(&self) -> Result<()> {
+    pub fn save(&self) -> Result<()> {
         let config_path = "/usr/local/bin/autoAP.conf";
         
         let content = format!(
@@ -87,7 +73,7 @@ debug={}
             if self.debug { 0 } else { 1 }
         );
 
-        fs::write(config_path, content).await
+        fs::write(config_path, content)
             .context("Failed to write autoAP config file")?;
 
         Ok(())
@@ -126,69 +112,5 @@ debug={}
         }
         
         Ok(config)
-    }
-}
-
-impl WifiConfig {
-    pub fn sanitize_strings(&mut self) {
-        // Remove quotes from SSID and PSK like the bash script does
-        self.ssid = self.ssid.replace('"', "");
-        self.psk = self.psk.replace('"', "");
-    }
-}
-
-impl ApConfig {
-    pub fn sanitize_strings(&mut self) {
-        // Remove quotes from SSID and PSK like the bash script does
-        self.ssid = self.ssid.replace('"', "");
-        self.psk = self.psk.replace('"', "");
-    }
-}
-
-impl InstallConfig {
-    pub async fn parse_existing_wpa_config() -> Result<Option<WifiConfig>> {
-        let possible_paths = [
-            "/etc/wpa_supplicant/wpa_supplicant.conf",
-            "/etc/wpa_supplicant/wpa_supplicant-wlan0.conf",
-        ];
-
-        for path in &possible_paths {
-            if Path::new(path).exists() {
-                info!("Found existing wpa_supplicant config at: {}", path);
-                
-                let content = fs::read_to_string(path).await
-                    .context("Failed to read wpa_supplicant config")?;
-                
-                return Ok(Self::extract_wifi_config(&content)?);
-            }
-        }
-
-        Ok(None)
-    }
-
-    fn extract_wifi_config(content: &str) -> Result<Option<WifiConfig>> {
-        let mut country = None;
-        let mut ssid = None;
-        let mut psk = None;
-
-        for line in content.lines() {
-            let line = line.trim();
-            
-            if line.starts_with("country=") {
-                country = Some(line.split('=').nth(1).unwrap_or("").trim().to_string());
-            } else if line.starts_with("ssid=") {
-                let value = line.split('=').nth(1).unwrap_or("").trim();
-                ssid = Some(value.trim_matches('"').to_string());
-            } else if line.starts_with("psk=") {
-                let value = line.split('=').nth(1).unwrap_or("").trim();
-                psk = Some(value.trim_matches('"').to_string());
-            }
-        }
-
-        if let (Some(country), Some(ssid), Some(psk)) = (country, ssid, psk) {
-            Ok(Some(WifiConfig { country, ssid, psk }))
-        } else {
-            Ok(None)
-        }
     }
 }

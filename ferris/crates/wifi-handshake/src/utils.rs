@@ -1,11 +1,11 @@
 use anyhow::{Context, Result};
+use std::fs;
 use std::path::Path;
 use std::process::Command;
-use tokio::fs;
 use tracing::{debug, warn};
 
 /// Check if autoAP is already installed by looking for key files
-pub async fn is_autoap_installed() -> bool {
+pub fn is_autoap_installed() -> bool {
     let required_files = [
         "/usr/local/bin/autoAP.conf",
         "/etc/systemd/system/wpa-autoap@wlan0.service",
@@ -36,7 +36,7 @@ pub async fn is_autoap_installed() -> bool {
 }
 
 /// Check if systemd-networkd is active
-pub async fn is_systemd_networkd_active() -> Result<bool> {
+pub fn is_systemd_networkd_active() -> Result<bool> {
     let output = Command::new("systemctl")
         .args(["is-active", "systemd-networkd"])
         .output()
@@ -47,7 +47,7 @@ pub async fn is_systemd_networkd_active() -> Result<bool> {
 }
 
 /// Check if systemd-resolved is active
-pub async fn is_systemd_resolved_active() -> Result<bool> {
+pub fn is_systemd_resolved_active() -> Result<bool> {
     let output = Command::new("systemctl")
         .args(["is-active", "systemd-resolved"])
         .output()
@@ -58,7 +58,7 @@ pub async fn is_systemd_resolved_active() -> Result<bool> {
 }
 
 /// Run a systemctl command
-pub async fn systemctl_command(args: &[&str]) -> Result<()> {
+pub fn systemctl_command(args: &[&str]) -> Result<()> {
     let output = Command::new("systemctl")
         .args(args)
         .output()
@@ -77,7 +77,7 @@ pub async fn systemctl_command(args: &[&str]) -> Result<()> {
 }
 
 /// Create a backup of a file if it exists
-pub async fn backup_file(original: &str) -> Result<()> {
+pub fn backup_file(original: &str) -> Result<()> {
     if !Path::new(original).exists() {
         return Ok(());
     }
@@ -88,14 +88,14 @@ pub async fn backup_file(original: &str) -> Result<()> {
     if Path::new(&backup_path).exists() {
         let old_backup = format!("{}.old", backup_path);
         if Path::new(&old_backup).exists() {
-            fs::remove_file(&old_backup).await
+            fs::remove_file(&old_backup)
                 .context("Failed to remove old backup")?;
         }
-        fs::rename(&backup_path, &old_backup).await
+        fs::rename(&backup_path, &old_backup)
             .context("Failed to move existing backup")?;
     }
 
-    fs::copy(original, &backup_path).await
+    fs::copy(original, &backup_path)
         .context("Failed to create backup")?;
 
     debug!("Created backup: {} -> {}", original, backup_path);
@@ -103,13 +103,13 @@ pub async fn backup_file(original: &str) -> Result<()> {
 }
 
 /// Write content to a file, creating parent directories if needed
-pub async fn write_file(path: &str, content: &str) -> Result<()> {
+pub fn write_file(path: &str, content: &str) -> Result<()> {
     if let Some(parent) = Path::new(path).parent() {
-        fs::create_dir_all(parent).await
+        fs::create_dir_all(parent)
             .context("Failed to create parent directories")?;
     }
 
-    fs::write(path, content).await
+    fs::write(path, content)
         .context(format!("Failed to write file: {}", path))?;
 
     debug!("Wrote file: {}", path);
@@ -117,7 +117,7 @@ pub async fn write_file(path: &str, content: &str) -> Result<()> {
 }
 
 /// Run wpa_cli command and return output
-pub async fn wpa_cli_command(interface: &str, args: &[&str]) -> Result<String> {
+pub fn wpa_cli_command(interface: &str, args: &[&str]) -> Result<String> {
     let mut cmd_args = vec!["-i", interface];
     cmd_args.extend(args);
 
@@ -139,22 +139,11 @@ pub async fn wpa_cli_command(interface: &str, args: &[&str]) -> Result<String> {
 }
 
 /// Check if any stations are connected to the AP
-pub async fn has_connected_stations(interface: &str) -> Result<bool> {
-    match wpa_cli_command(interface, &["all_sta"]).await {
+pub fn has_connected_stations(interface: &str) -> Result<bool> {
+    match wpa_cli_command(interface, &["all_sta"]) {
         Ok(output) => Ok(!output.trim().is_empty()),
         Err(e) => {
             warn!("Failed to check connected stations: {}", e);
-            Ok(false)
-        }
-    }
-}
-
-/// Check if interface is in station mode
-pub async fn is_station_mode(interface: &str) -> Result<bool> {
-    match wpa_cli_command(interface, &["status"]).await {
-        Ok(output) => Ok(output.contains("mode=station")),
-        Err(e) => {
-            warn!("Failed to check station mode: {}", e);
             Ok(false)
         }
     }

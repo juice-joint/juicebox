@@ -5,7 +5,7 @@ use tokio::time::{sleep, Duration};
 use tracing::{debug, error, info, warn};
 
 use crate::config::AutoApConfig;
-use crate::utils::{has_connected_stations, is_station_mode, systemctl_command, wpa_cli_command};
+use crate::utils::{has_connected_stations, systemctl_command, wpa_cli_command};
 
 #[derive(Debug, Clone)]
 pub enum WifiState {
@@ -39,7 +39,7 @@ pub struct AutoAp {
 
 impl AutoAp {
     pub async fn new() -> Result<Self> {
-        let config = AutoApConfig::load().await?;
+        let config = AutoApConfig::load()?;
         Ok(Self { config })
     }
 
@@ -359,16 +359,16 @@ impl AutoAp {
 
     async fn restart_systemd_networkd(&self) -> Result<()> {
         // Check if systemd-networkd is enabled/running first
-        if !crate::utils::is_systemd_networkd_active().await? {
+        if !crate::utils::is_systemd_networkd_active()? {
             warn!("systemd-networkd is not active, attempting to start it");
-            systemctl_command(&["start", "systemd-networkd"]).await
+            systemctl_command(&["start", "systemd-networkd"])
                 .context("Failed to start systemd-networkd")?;
             
             // Give it a moment to start
             tokio::time::sleep(Duration::from_millis(500)).await;
         }
         
-        systemctl_command(&["restart", "systemd-networkd"]).await
+        systemctl_command(&["restart", "systemd-networkd"])
     }
 
     async fn wpa_cli_command_with_output(&self, device: &str, args: &[&str]) -> Result<String> {
@@ -442,9 +442,9 @@ impl AutoAp {
         info!("Checking wpa reconfigure after wait loop");
         
         // Check if any stations are connected
-        if !has_connected_stations(device).await.unwrap_or(true) {
+        if !has_connected_stations(device).unwrap_or(true) {
             info!("No stations connected; performing wpa reconfigure");
-            if let Err(e) = wpa_cli_command(device, &["reconfigure"]).await {
+            if let Err(e) = wpa_cli_command(device, &["reconfigure"]) {
                 error!("wpa_cli reconfigure failed: {}", e);
             }
         }
