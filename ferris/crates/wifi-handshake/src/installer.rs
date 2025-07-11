@@ -34,19 +34,42 @@ impl Installer {
     }
 
     async fn check_systemd_networkd(&self) -> Result<()> {
+        info!("Checking systemd-networkd configuration...");
+        
         if !is_systemd_networkd_active().await? {
-            warn!("This system is not configured to use systemd-networkd");
-            warn!("You must switch to using systemd-networkd to use autoAP");
-            warn!("You can use /usr/local/bin/rpi-networkconfig to reconfigure your networking");
-            warn!("rpi-networkconfig will configure wlan0 and eth0 to be DHCP-enabled");
-            warn!("This can be done after install-autoAP has completed.");
-
-            if !Confirm::new()
-                .with_prompt("Do you want to continue with autoAP installation?")
+            warn!("systemd-networkd is not active");
+            warn!("autoAP requires systemd-networkd to manage network configurations");
+            
+            if Confirm::new()
+                .with_prompt("Would you like autoAP to enable and start systemd-networkd?")
                 .interact()?
             {
-                return Err(anyhow::anyhow!("Installation cancelled by user"));
+                info!("Enabling and starting systemd-networkd...");
+                systemctl_command(&["enable", "systemd-networkd"]).await
+                    .context("Failed to enable systemd-networkd")?;
+                systemctl_command(&["start", "systemd-networkd"]).await
+                    .context("Failed to start systemd-networkd")?;
+                
+                // Verify it's now running
+                if !is_systemd_networkd_active().await? {
+                    return Err(anyhow::anyhow!("Failed to start systemd-networkd"));
+                }
+                info!("systemd-networkd is now active");
+            } else {
+                warn!("You must switch to using systemd-networkd to use autoAP");
+                warn!("You can use /usr/local/bin/rpi-networkconfig to reconfigure your networking");
+                warn!("rpi-networkconfig will configure wlan0 and eth0 to be DHCP-enabled");
+                warn!("This can be done after install-autoAP has completed.");
+
+                if !Confirm::new()
+                    .with_prompt("Do you want to continue with autoAP installation anyway?")
+                    .interact()?
+                {
+                    return Err(anyhow::anyhow!("Installation cancelled by user"));
+                }
             }
+        } else {
+            info!("systemd-networkd is active ✓");
         }
 
         Ok(())
@@ -182,6 +205,64 @@ impl Installer {
         // Configure services
         self.configure_services().await?;
 
+        // Verify installation
+        self.verify_installation().await?;
+
+        Ok(())
+    }
+
+    async fn verify_installation(&self) -> Result<()> {
+        info!("Verifying installation...");
+
+        // Check that systemd-networkd is still running
+        if !is_systemd_networkd_active().await? {
+            warn!("systemd-networkd is not active after installation");
+            return Err(anyhow::anyhow!("systemd-networkd failed to start properly"));
+        }
+
+        // Check systemd-resolved if it should be running
+        let resolved_active = std::process::Command::new("systemctl")
+            .args(["is-active", "systemd-resolved"])
+            .output()
+            .map(|o| o.status.success())
+            .unwrap_or(false);
+        
+        if resolved_active {
+            info!("systemd-resolved is active ✓");
+        }
+
+        // Check that required services are enabled
+        let services_to_check = [
+            "wpa_supplicant@wlan0",
+            "wpa-autoap@wlan0", 
+            "wpa-autoap-restore",
+            "systemd-networkd"
+        ];
+
+        for service in &services_to_check {
+            let output = std::process::Command::new("systemctl")
+                .args(["is-enabled", service])
+                .output()
+                .context("Failed to check service status")?;
+            
+            if !output.status.success() {
+                warn!("Service {} is not enabled", service);
+            } else {
+                info!("Service {} is enabled ✓", service);
+            }
+        }
+
+        // Test that our binary is accessible and working
+        let output = std::process::Command::new("/usr/local/bin/autoap")
+            .args(["--help"])
+            .output()
+            .context("Failed to test autoap binary")?;
+            
+        if !output.status.success() {
+            return Err(anyhow::anyhow!("autoap binary is not working properly"));
+        }
+
+        info!("Installation verification completed ✓");
         Ok(())
     }
 
@@ -264,6 +345,7 @@ DHCP=ipv4
 [DHCP]
 RouteMetric=20
 UseDomains=yes
+UseDNS=yes
 
 "#;
         write_file("/etc/systemd/network/11-wlan0.network", client_config).await?;
