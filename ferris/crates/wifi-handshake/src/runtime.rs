@@ -199,7 +199,11 @@ impl AutoAp {
                 .context("Failed to backup network file")?;
 
             self.restart_systemd_networkd().await?;
-            self.run_local_script("AccessPoint").await?;
+            
+            // Call Rust function directly instead of bash script
+            if let Err(e) = self.on_access_point_mode(device).await {
+                warn!("Access Point mode hook failed: {}", e);
+            }
         }
 
         Ok(())
@@ -216,9 +220,29 @@ impl AutoAp {
                 .context("Failed to restore network file")?;
 
             self.restart_systemd_networkd().await?;
-            self.run_local_script("Client").await?;
+            
+            // Call Rust function directly instead of bash script
+            if let Err(e) = self.on_client_mode(device).await {
+                warn!("Client mode hook failed: {}", e);
+            }
         }
 
+        Ok(())
+    }
+
+    /// Called when switching to Access Point mode
+    /// Replace this with your actual functionality
+    async fn on_access_point_mode(&self, device: &str) -> Result<()> {
+        info!("Executing Access Point mode hooks for {}", device);
+        
+        Ok(())
+    }
+
+    /// Called when switching to Client mode (connected to WiFi)
+    /// Replace this with your actual functionality
+    async fn on_client_mode(&self, device: &str) -> Result<()> {
+        info!("Executing Client mode hooks for {}", device);
+        
         Ok(())
     }
 
@@ -234,32 +258,6 @@ impl AutoAp {
         }
         
         systemctl_command(&["restart", "systemd-networkd"]).await
-    }
-
-    async fn run_local_script(&self, mode: &str) -> Result<()> {
-        let script_path = "/usr/local/bin/autoAP-local.sh";
-        
-        if !Path::new(script_path).exists() {
-            return Ok(()); // Script doesn't exist, which is fine
-        }
-
-        // Check if executable
-        if !crate::utils::is_executable(script_path).await {
-            return Ok(()); // Not executable
-        }
-
-        let output = tokio::process::Command::new(script_path)
-            .arg(mode)
-            .output()
-            .await
-            .context("Failed to run local script")?;
-
-        if !output.status.success() {
-            let stderr = String::from_utf8_lossy(&output.stderr);
-            warn!("Local script failed: {}", stderr);
-        }
-
-        Ok(())
     }
 
     // Static version for use in spawned tasks
