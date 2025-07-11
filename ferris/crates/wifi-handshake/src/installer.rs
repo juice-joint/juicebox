@@ -326,9 +326,6 @@ impl Installer {
         // Create systemd service files
         self.setup_systemd_services().await?;
 
-        // Create local script
-        self.setup_local_script().await?;
-
         // Save autoAP configuration
         config.autoap.save().await?;
 
@@ -537,39 +534,6 @@ WantedBy=multi-user.target
         write_file("/etc/systemd/system/wpa-autoap-restore.service", restore_service).await?;
 
         info!("Created systemd service files");
-        Ok(())
-    }
-
-    async fn setup_local_script(&self) -> Result<()> {
-        info!("Creating /usr/local/bin/autoAP-local.sh...");
-
-        backup_file("/usr/local/bin/autoAP-local.sh").await?;
-
-        let local_script = r#"#!/bin/bash
-# $1 has either "Client" or "AccessPoint"
-
-logmsg () {
-    [ $debug -eq 0 ] && logger --id=$$ "$1"
-}
-
-[ -f /usr/local/bin/autoAP.conf ] && source /usr/local/bin/autoAP.conf || debug=0
-
-case "$1" in
-    Client)
-          logmsg "/usr/local/bin/autoAP-local: Client"
-	  ## Add your code here that runs when the Client WiFi is enabled
-	  ;;
-    AccessPoint)
-          logmsg "/usr/local/bin/autoAP-local: Access Point"
-	  ## Add your code here that runs when the Access Point is enabled
-	  ;;
-esac
-"#;
-
-        write_file("/usr/local/bin/autoAP-local.sh", local_script).await?;
-        make_executable("/usr/local/bin/autoAP-local.sh").await?;
-
-        info!("Created local script");
         Ok(())
     }
 
