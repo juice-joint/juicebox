@@ -15,8 +15,8 @@ impl Installer {
     pub async fn install(&self) -> Result<()> {
         info!("Starting autoAP installation...");
 
-        // Check systemd-networkd
-        self.check_systemd_networkd().await?;
+        // Check required systemd services
+        self.check_required_systemd_services().await?;
 
         // Gather configuration
         let config = self.gather_configuration().await?;
@@ -33,43 +33,60 @@ impl Installer {
         Ok(())
     }
 
-    async fn check_systemd_networkd(&self) -> Result<()> {
-        info!("Checking systemd-networkd configuration...");
+    async fn check_required_systemd_services(&self) -> Result<()> {
+        info!("Checking required systemd services...");
         
-        if !is_systemd_networkd_active().await? {
-            warn!("systemd-networkd is not active");
-            warn!("autoAP requires systemd-networkd to manage network configurations");
+        // Check systemd-networkd
+        self.check_and_enable_service("systemd-networkd", "manage network configurations").await?;
+        
+        // Check systemd-resolved
+        self.check_and_enable_service("systemd-resolved", "provide DNS resolution").await?;
+
+        Ok(())
+    }
+
+    async fn check_and_enable_service(&self, service_name: &str, description: &str) -> Result<()> {
+        info!("Checking {} configuration...", service_name);
+        
+        let is_active = match service_name {
+            "systemd-networkd" => is_systemd_networkd_active().await?,
+            "systemd-resolved" => is_systemd_resolved_active().await?,
+            _ => return Err(anyhow::anyhow!("Unknown service: {}", service_name)),
+        };
+
+        if !is_active {
+            warn!("{} is not active", service_name);
+            warn!("autoAP requires {} to {}", service_name, description);
             
             if Confirm::new()
-                .with_prompt("Would you like autoAP to enable and start systemd-networkd?")
+                .with_prompt(format!("Would you like autoAP to enable and start {}?", service_name))
                 .interact()?
             {
-                info!("Enabling and starting systemd-networkd...");
-                systemctl_command(&["enable", "systemd-networkd"]).await
-                    .context("Failed to enable systemd-networkd")?;
-                systemctl_command(&["start", "systemd-networkd"]).await
-                    .context("Failed to start systemd-networkd")?;
+                info!("Enabling and starting {}...", service_name);
+                systemctl_command(&["enable", service_name]).await
+                    .context(format!("Failed to enable {}", service_name))?;
+                systemctl_command(&["start", service_name]).await
+                    .context(format!("Failed to start {}", service_name))?;
                 
                 // Verify it's now running
-                if !is_systemd_networkd_active().await? {
-                    return Err(anyhow::anyhow!("Failed to start systemd-networkd"));
-                }
-                info!("systemd-networkd is now active");
-            } else {
-                warn!("You must switch to using systemd-networkd to use autoAP");
-                warn!("You can use /usr/local/bin/rpi-networkconfig to reconfigure your networking");
-                warn!("rpi-networkconfig will configure wlan0 and eth0 to be DHCP-enabled");
-                warn!("This can be done after install-autoAP has completed.");
+                let is_now_active = match service_name {
+                    "systemd-networkd" => is_systemd_networkd_active().await?,
+                    "systemd-resolved" => is_systemd_resolved_active().await?,
+                    _ => return Err(anyhow::anyhow!("Unknown service: {}", service_name)),
+                };
 
-                if !Confirm::new()
-                    .with_prompt("Do you want to continue with autoAP installation anyway?")
-                    .interact()?
-                {
-                    return Err(anyhow::anyhow!("Installation cancelled by user"));
+                if !is_now_active {
+                    return Err(anyhow::anyhow!("Failed to start {}", service_name));
                 }
+                info!("{} is now active", service_name);
+            } else {
+                return Err(anyhow::anyhow!(
+                    "Installation cancelled: {} is required for autoAP to function properly", 
+                    service_name
+                ));
             }
         } else {
-            info!("systemd-networkd is active ✓");
+            info!("{} is active ✓", service_name);
         }
 
         Ok(())
@@ -205,7 +222,7 @@ impl Installer {
         // Configure services
         self.configure_services().await?;
 
-        // Verify installation
+        // Verify installation (both services should now be active)
         self.verify_installation().await?;
 
         Ok(())
@@ -216,21 +233,23 @@ impl Installer {
 
         // Check that systemd-networkd is still running
         if !is_systemd_networkd_active().await? {
-            warn!("systemd-networkd is not active after installation");
-            return Err(anyhow::anyhow!("systemd-networkd failed to start properly"));
+            return Err(anyhow::anyhow!("systemd-networkd is not active after installation"));
         }
+        info!("systemd-networkd is active ✓");
 
-        // Check systemd-resolved if it should be running
-        if is_systemd_resolved_active().await.unwrap_or(false) {
-            info!("systemd-resolved is active ✓");
+        // Check that systemd-resolved is running (now mandatory)
+        if !is_systemd_resolved_active().await? {
+            return Err(anyhow::anyhow!("systemd-resolved is not active after installation"));
         }
+        info!("systemd-resolved is active ✓");
 
         // Check that required services are enabled
         let services_to_check = [
             "wpa_supplicant@wlan0",
             "wpa-autoap@wlan0", 
             "wpa-autoap-restore",
-            "systemd-networkd"
+            "systemd-networkd",
+            "systemd-resolved"  // Added to verification list
         ];
 
         for service in &services_to_check {
