@@ -281,24 +281,16 @@ impl AutoAp {
 
             self.restart_systemd_networkd().await?;
             
-            // Wait for systemd-networkd to settle before reconfiguring wpa_supplicant
-            info!("Waiting for systemd-networkd to settle...");
-            tokio::time::sleep(Duration::from_secs(2)).await;
-            
-            // Force wpa_supplicant to reconfigure and switch to AP mode with retries
+            // Force wpa_supplicant to reconfigure and switch to AP mode
+            // If this fails due to timing, systemd will restart us automatically
             info!("Forcing wpa_supplicant to reconfigure for AP mode");
-            for attempt in 1..=3 {
-                match wpa_cli_command(device, &["reconfigure"]).await {
-                    Ok(_) => {
-                        info!("wpa_cli reconfigure succeeded on attempt {}", attempt);
-                        break;
-                    }
-                    Err(e) => {
-                        warn!("wpa_cli reconfigure failed on attempt {}: {}", attempt, e);
-                        if attempt < 3 {
-                            tokio::time::sleep(Duration::from_secs(1)).await;
-                        }
-                    }
+            match self.wpa_cli_command_with_output(device, &["reconfigure"]).await {
+                Ok(output) => {
+                    info!("wpa_cli reconfigure succeeded: {}", output);
+                }
+                Err(e) => {
+                    error!("wpa_cli reconfigure failed: {}", e);
+                    return Err(anyhow::anyhow!("wpa_cli reconfigure failed - will be retried by systemd: {}", e));
                 }
             }
             
@@ -377,6 +369,35 @@ impl AutoAp {
         }
         
         systemctl_command(&["restart", "systemd-networkd"]).await
+    }
+
+    async fn wpa_cli_command_with_output(&self, device: &str, args: &[&str]) -> Result<String> {
+        let output = tokio::process::Command::new("/sbin/wpa_cli")
+            .arg("-i")
+            .arg(device)
+            .args(args)
+            .output()
+            .await
+            .context("Failed to execute wpa_cli command")?;
+
+        let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
+        let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
+
+        if !output.status.success() {
+            return Err(anyhow::anyhow!(
+                "wpa_cli command failed with exit code: {} - stdout: '{}' - stderr: '{}'",
+                output.status.code().unwrap_or(-1),
+                stdout,
+                stderr
+            ));
+        }
+
+        // Return stdout, but also log stderr if it's not empty
+        if !stderr.is_empty() {
+            warn!("wpa_cli command stderr: {}", stderr);
+        }
+
+        Ok(stdout)
     }
 
     // Static version for use in spawned tasks
