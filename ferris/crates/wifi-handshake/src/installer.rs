@@ -3,7 +3,7 @@ use dialoguer::{Confirm, Input};
 use tracing::{info, warn};
 
 use crate::config::{ApConfig, AutoApConfig, InstallConfig, WifiConfig};
-use crate::utils::{backup_file, is_systemd_networkd_active, is_systemd_resolved_active, systemctl_command, write_file};
+use crate::utils::{backup_file, is_systemd_networkd_active, is_systemd_resolved_active, make_executable, systemctl_command, write_file};
 
 pub struct Installer;
 
@@ -36,12 +36,93 @@ impl Installer {
     async fn check_required_systemd_services(&self) -> Result<()> {
         info!("Checking required systemd services...");
         
+        // Check for NetworkManager conflict first
+        self.check_network_manager_conflict().await?;
+        
         // Check systemd-networkd
         self.check_and_enable_service("systemd-networkd", "manage network configurations").await?;
         
         // Check systemd-resolved
         self.check_and_enable_service("systemd-resolved", "provide DNS resolution").await?;
 
+        Ok(())
+    }
+
+    async fn check_network_manager_conflict(&self) -> Result<()> {
+        info!("Checking for NetworkManager conflicts...");
+        
+        // Check if NetworkManager is active
+        let output = std::process::Command::new("systemctl")
+            .args(["is-active", "NetworkManager"])
+            .output()
+            .context("Failed to check NetworkManager status")?;
+        
+        if output.status.success() {
+            warn!("NetworkManager is active and will conflict with autoAP");
+            warn!("NetworkManager and wpa_supplicant@wlan0 cannot both manage the same interface");
+            
+            if Confirm::new()
+                .with_prompt("Would you like autoAP to disable NetworkManager? (Recommended)")
+                .interact()?
+            {
+                info!("Stopping and disabling NetworkManager...");
+                
+                // Stop NetworkManager
+                std::process::Command::new("systemctl")
+                    .args(["stop", "NetworkManager"])
+                    .output()
+                    .context("Failed to stop NetworkManager")?;
+                
+                // Disable NetworkManager
+                std::process::Command::new("systemctl")
+                    .args(["disable", "NetworkManager"])
+                    .output()
+                    .context("Failed to disable NetworkManager")?;
+                
+                // Mask NetworkManager to prevent accidental re-enabling
+                std::process::Command::new("systemctl")
+                    .args(["mask", "NetworkManager"])
+                    .output()
+                    .context("Failed to mask NetworkManager")?;
+                
+                info!("NetworkManager has been disabled");
+            } else if Confirm::new()
+                .with_prompt("Configure NetworkManager to ignore wlan0 instead?")
+                .interact()?
+            {
+                self.configure_network_manager_ignore().await?;
+            } else {
+                return Err(anyhow::anyhow!(
+                    "Installation cancelled: NetworkManager conflicts with autoAP must be resolved"
+                ));
+            }
+        } else {
+            info!("NetworkManager is not active ✓");
+        }
+        
+        Ok(())
+    }
+
+    async fn configure_network_manager_ignore(&self) -> Result<()> {
+        info!("Configuring NetworkManager to ignore wlan0...");
+        
+        // Create NetworkManager config directory if it doesn't exist
+        tokio::fs::create_dir_all("/etc/NetworkManager/conf.d").await
+            .context("Failed to create NetworkManager config directory")?;
+        
+        let config_content = r#"[keyfile]
+unmanaged-devices=interface-name:wlan0
+"#;
+        
+        write_file("/etc/NetworkManager/conf.d/99-unmanaged-devices.conf", config_content).await?;
+        
+        // Restart NetworkManager to apply the configuration
+        std::process::Command::new("systemctl")
+            .args(["restart", "NetworkManager"])
+            .output()
+            .context("Failed to restart NetworkManager")?;
+        
+        info!("NetworkManager configured to ignore wlan0");
         Ok(())
     }
 
@@ -326,6 +407,9 @@ impl Installer {
         // Create systemd service files
         self.setup_systemd_services().await?;
 
+        // Create local script
+        self.setup_local_script().await?;
+
         // Save autoAP configuration
         config.autoap.save().await?;
 
@@ -534,6 +618,12 @@ WantedBy=multi-user.target
         write_file("/etc/systemd/system/wpa-autoap-restore.service", restore_service).await?;
 
         info!("Created systemd service files");
+        Ok(())
+    }
+
+    async fn setup_local_script(&self) -> Result<()> {
+        // No longer needed - using direct Rust function calls instead of bash script
+        info!("Skipping local script creation - using direct Rust function calls");
         Ok(())
     }
 
