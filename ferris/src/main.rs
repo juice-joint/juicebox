@@ -29,7 +29,7 @@ async fn main() {
     start_connectivity_monitoring(config_dir.clone(), ui_controller.clone()).await;
 
     // Run the desktop window
-    match run_desktop_window(event_loop).await {
+    match run_desktop_window(event_loop, ui_controller.clone()).await {
         Ok(_) => info!("Desktop app closed successfully"),
         Err(e) => error!("Desktop app error: {}", e),
     }
@@ -83,7 +83,11 @@ async fn start_connectivity_monitoring(config_dir: PathBuf, ui_controller: UISta
         let mut was_connected = false;
         
         loop {
+            info!("looping");
             let is_connected = check_internet_connectivity().await;
+
+            info!("is_connected: {}", is_connected);
+            info!("was_connected: {}", was_connected);
             
             if is_connected && !was_connected {
                 // Connection restored or established
@@ -99,7 +103,12 @@ async fn start_connectivity_monitoring(config_dir: PathBuf, ui_controller: UISta
                 }
             } else if !is_connected && was_connected {
                 // Connection lost
+                info!("wtf");
                 warn!("Lost internet connection");
+                ui_controller.show_waiting_for_wifi();
+            } else if !is_connected && !was_connected {
+                // Connection lost
+                warn!("Never had internet connection");
                 ui_controller.show_waiting_for_wifi();
             }
             
@@ -111,9 +120,13 @@ async fn start_connectivity_monitoring(config_dir: PathBuf, ui_controller: UISta
 
 async fn run_desktop_window(
     event_loop: tao::event_loop::EventLoop<AppEvent>,
+    ui_controller: UIStateController,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let is_connected = check_internet_connectivity().await;
     let initial_url = UIStateController::get_initial_url(is_connected);
+    
+    // Load initial URL with refresh
+    ui_controller.load_initial_url(is_connected);
     
     desktop::window::create_desktop_webview(initial_url, event_loop)
         .map(|_| ())
