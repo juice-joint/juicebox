@@ -87,6 +87,7 @@ function WaitingForWiFi() {
         <p className="text-white text-3xl font-medium mb-2">Waiting for WiFi...</p>
         <p className="text-white/70 text-lg">Please connect to a WiFi network to continue</p>
       </div>
+      <QRCodeBanner />
     </div>
   );
 }

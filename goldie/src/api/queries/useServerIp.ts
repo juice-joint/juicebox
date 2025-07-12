@@ -15,5 +15,6 @@ export function useServerIp() {
   return useQuery({
     queryFn: getServerIp,
     queryKey: QUERY_KEYS.ip,
+    refetchInterval: 5000,
   });
 }
