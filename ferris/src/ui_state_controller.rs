@@ -18,6 +18,8 @@ impl UIStateController {
         info!("Switching to waiting-for-wifi view");
         self.window_event_handle
             .load_url("http://localhost:8000/goldie?view=waiting-for-wifi".to_string());
+
+        self.refresh_window();
     }
 
     /// Show the loading screen
