@@ -62,23 +62,23 @@ impl UIStateController {
     /// Refresh the window (hide/show workaround)
     fn refresh_window(&self) {
         self.window_event_handle.hide_window();
-        thread::sleep(Duration::from_millis(100));
+        thread::sleep(Duration::from_millis(2000));
         self.window_event_handle.show_window();
     }
 
     /// Get the initial URL based on connectivity
     pub fn get_initial_url(is_connected: bool) -> &'static str {
-        if is_connected {
-            "http://localhost:8000/goldie?view=loading"
-        } else {
-            "http://localhost:8000/goldie?view=waiting-for-wifi"
-        }
+        "http://localhost:8000/goldie?view=loading"
     }
 
     /// Load the initial URL and refresh window
     pub fn load_initial_url(&self, is_connected: bool) {
         let url = Self::get_initial_url(is_connected);
         info!("Loading initial URL: {}", url);
-        self.load_url_if_different(url.to_string());
+        self.window_event_handle.load_url(url.to_string());
+        let mut current = self.current_url.lock().unwrap();
+        *current = Some(url.to_string());
+        drop(current);
+        self.refresh_window();
     }
 }

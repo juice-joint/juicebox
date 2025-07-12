@@ -79,6 +79,7 @@ async fn check_internet_connectivity() -> bool {
 
 async fn start_connectivity_monitoring(config_dir: PathBuf, ui_controller: UIStateController) {
     tokio::spawn(async move {
+        tokio::time::sleep(Duration::from_secs(5)).await;
         info!("Starting connectivity monitoring");
         let mut was_connected = false;
         
@@ -107,8 +108,6 @@ async fn start_connectivity_monitoring(config_dir: PathBuf, ui_controller: UISta
                 warn!("Lost internet connection");
                 ui_controller.show_waiting_for_wifi();
             } else if !is_connected && !was_connected {
-                // Connection lost
-                warn!("Never had internet connection");
                 ui_controller.show_waiting_for_wifi();
             }
             
@@ -124,9 +123,6 @@ async fn run_desktop_window(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let is_connected = check_internet_connectivity().await;
     let initial_url = UIStateController::get_initial_url(is_connected);
-    
-    // Load initial URL with refresh
-    ui_controller.load_initial_url(is_connected);
     
     desktop::window::create_desktop_webview(initial_url, event_loop)
         .map(|_| ())
