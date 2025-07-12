@@ -14,7 +14,7 @@ path = "build.rs"
 
 [workspace]
 members = [
-    "crates/binary-sidecar", "crates/wifi-handshake",
+    "crates/binary-sidecar", "crates/wifi-handshake", "crates/wpa-events",
 ]
 
 [dependencies]
