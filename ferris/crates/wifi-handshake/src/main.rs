@@ -6,6 +6,8 @@ mod config;
 mod installer;
 mod runtime;
 mod utils;
+mod web_server;
+mod wpa_manager;
 
 use config::AutoApConfig;
 use installer::Installer;
@@ -54,6 +56,12 @@ enum Commands {
     Start {
         /// Interface name (e.g., wlan0)
         interface: String,
+    },
+    /// Start web server for WiFi configuration
+    WebServer {
+        /// Port to run web server on
+        #[arg(short, long, default_value = "8080")]
+        port: u16,
     },
     /// Uninstall autoAP
     Uninstall {
@@ -201,6 +209,14 @@ async fn main() -> Result<()> {
                 autoap.start(&interface).await?;
             } else {
                 error!("autoAP is not installed");
+                std::process::exit(1);
+            }
+        }
+        Some(Commands::WebServer { port }) => {
+            info!("Starting WiFi configuration web server on port {}", port);
+            let server = web_server::WebServer::new();
+            if let Err(e) = server.start(port).await {
+                error!("Failed to start web server: {}", e);
                 std::process::exit(1);
             }
         }
