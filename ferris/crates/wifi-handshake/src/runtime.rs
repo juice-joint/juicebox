@@ -264,11 +264,9 @@ impl AutoApHandler {
         // We're only truly connected if we have an SSID, IP address, completed state, and not in AP mode
         let is_connected = has_ssid && has_ip_address && wpa_state_completed && not_in_ap_mode;
         
-        if is_connected {
-            debug!("Connection check - SSID: {}, IP: {}, State: {}, Not AP: {}, Connected: {}", 
-                   has_ssid, has_ip_address, wpa_state_completed, not_in_ap_mode, is_connected);
-            debug!("wpa_cli status output: {}", status);
-        }
+        // Log all the individual checks so we can see which one is failing
+        info!("Connection check - SSID: {}, IP: {}, State: {}, Not AP: {}, Final Connected: {}", 
+               has_ssid, has_ip_address, wpa_state_completed, not_in_ap_mode, is_connected);
         
         Ok(is_connected)
     }
