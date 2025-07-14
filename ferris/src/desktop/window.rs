@@ -1,5 +1,6 @@
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+use std::time::Duration;
 use tao::{
     event::{Event, WindowEvent},
     event_loop::{ControlFlow, EventLoop, EventLoopProxy},
@@ -75,9 +76,8 @@ pub fn create_desktop_webview(
         let vbox = window.default_vbox().unwrap();
         builder.build_gtk(vbox)?
     };
-
+    
     // Run the event loop, for some reason this can't be in a different function...
-    let first_load_url = Arc::new(AtomicBool::new(true));
     event_loop.run(move |event, _, control_flow| {
         *control_flow = ControlFlow::Wait;
 
@@ -92,15 +92,7 @@ pub fn create_desktop_webview(
             Event::UserEvent(app_event) => match app_event {
                 AppEvent::LoadUrl(url) => {
                     info!("Webview LoadUrl requested");
-                    
-                    // Refresh window on first load to handle https://github.com/tauri-apps/tauri/issues/9289
-                    if first_load_url.compare_exchange(true, false, Ordering::SeqCst, Ordering::SeqCst).is_ok() {
-                        info!("First LoadUrl detected, applying visibility workaround");
-                        window.set_visible(false);
-                        std::thread::sleep(std::time::Duration::from_millis(1000));
-                        window.set_visible(true);
-                    }
-                    
+                
                     match webview.load_url(&url) {
                         Ok(_) => info!("Successfully loaded url {} in webview", url),
                         Err(_) => error!("Error loading url {} in webview", url),

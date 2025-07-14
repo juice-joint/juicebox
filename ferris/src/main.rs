@@ -29,6 +29,16 @@ async fn main() {
     let (event_loop, window_event_handle) = create_window_components();
     let ui_controller = UIStateController::new(window_event_handle.clone(), initial_url);
 
+    // Refresh window to handle https://github.com/tauri-apps/tauri/issues/9289
+    // TODO, make 2000ms not time based
+    let window_event_handle_clone = window_event_handle.clone();
+    tokio::spawn(async move {
+        tokio::time::sleep(tokio::time::Duration::from_millis(2000)).await;
+        window_event_handle_clone.hide_window();
+        tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+        window_event_handle_clone.show_window();
+    });
+
     // Always start connectivity monitoring - it will handle initialization when online
     start_connectivity_monitoring(config_dir.clone(), ui_controller.clone()).await;
 
