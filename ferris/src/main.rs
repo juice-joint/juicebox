@@ -18,18 +18,22 @@ async fn main() {
     let addr = SocketAddr::from(([0, 0, 0, 0], 8000));
     let config_dir = PathBuf::from("./config");
 
+    // Check connection
+    let is_connected = check_internet_connectivity().await;
+    let initial_url = get_initial_url(is_connected);
+
     // Start the server
     let server_handle = start_server(addr).await;
 
     // Create window event loop and handle
     let (event_loop, window_event_handle) = create_window_components();
-    let ui_controller = UIStateController::new(window_event_handle.clone());
+    let ui_controller = UIStateController::new(window_event_handle.clone(), initial_url);
 
     // Always start connectivity monitoring - it will handle initialization when online
     start_connectivity_monitoring(config_dir.clone(), ui_controller.clone()).await;
 
     // Run the desktop window
-    match run_desktop_window(event_loop, ui_controller.clone()).await {
+    match run_desktop_window(event_loop, initial_url).await {
         Ok(_) => info!("Desktop app closed successfully"),
         Err(e) => error!("Desktop app error: {}", e),
     }
@@ -62,6 +66,15 @@ fn create_window_components() -> (tao::event_loop::EventLoop<AppEvent>, WindowEv
     (event_loop, window_event_handle)
 }
 
+/// Get the initial URL based on connectivity
+fn get_initial_url(is_connected: bool) -> &'static str {
+    if is_connected {
+        "http://localhost:8000/goldie?view=loading"
+    } else {
+        "http://localhost:8000/goldie?view=waiting-for-wifi"
+    }
+}
+
 async fn check_internet_connectivity() -> bool {
     // Try to connect to a reliable DNS server (Google's 8.8.8.8)
     use std::net::SocketAddr;
@@ -79,7 +92,7 @@ async fn check_internet_connectivity() -> bool {
 
 async fn start_connectivity_monitoring(config_dir: PathBuf, ui_controller: UIStateController) {
     tokio::spawn(async move {
-        tokio::time::sleep(Duration::from_secs(5)).await;
+        tokio::time::sleep(Duration::from_secs(10)).await;
         info!("Starting connectivity monitoring");
         let mut was_connected = false;
         
@@ -99,7 +112,7 @@ async fn start_connectivity_monitoring(config_dir: PathBuf, ui_controller: UISta
                     ui_controller.show_home();
                 } else {
                     // Need to initialize binaries
-                    ui_controller.handle_connectivity_restored();
+                    ui_controller.show_loading();
                     BinaryInitializer::initialize(config_dir.clone(), ui_controller.clone()).await;
                 }
             } else if !is_connected && was_connected {
@@ -119,11 +132,8 @@ async fn start_connectivity_monitoring(config_dir: PathBuf, ui_controller: UISta
 
 async fn run_desktop_window(
     event_loop: tao::event_loop::EventLoop<AppEvent>,
-    ui_controller: UIStateController,
-) -> Result<(), Box<dyn std::error::Error>> {
-    let is_connected = check_internet_connectivity().await;
-    let initial_url = UIStateController::get_initial_url(is_connected);
-    
+    initial_url: &'static str
+) -> Result<(), Box<dyn std::error::Error>> {    
     desktop::window::create_desktop_webview(initial_url, event_loop)
         .map(|_| ())
         .map_err(|e| Box::new(e) as Box<dyn std::error::Error>)

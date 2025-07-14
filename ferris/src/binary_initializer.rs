@@ -28,7 +28,7 @@ impl BinaryInitializer {
         // Check if already initialized
         if Self::are_binaries_initialized() {
             info!("Binaries already initialized, skipping download");
-            ui_controller.handle_initialization_complete();
+            ui_controller.show_home();
             return;
         }
 
@@ -82,7 +82,7 @@ impl BinaryInitializer {
             info!("All binaries initialized successfully");
 
             // Signal completion to UI
-            ui_controller.handle_initialization_complete();
+            ui_controller.show_home();
             
             // Initialize config directory
             init_config_dir(config_dir);
