@@ -3,6 +3,7 @@ import { useCurrentSong } from "./api/queries/useCurrentSong";
 import { useEventSource } from "./api/sse/useEventSource";
 import { ErrorScreen } from "./components/error/component";
 import QRCodeBanner from "./components/qr-code/component";
+import AutoApQRCode from "./components/autoap-qr-code/component";
 import { Queue } from "./components/queue/component";
 import { Splash } from "./components/splash/component";
 import { VideoPlayer } from "./components/video-player";
@@ -87,7 +88,7 @@ function WaitingForWiFi() {
         <p className="text-white text-3xl font-medium mb-2">Waiting for WiFi...</p>
         <p className="text-white/70 text-lg">Please connect to a WiFi network to continue</p>
       </div>
-      <QRCodeBanner />
+      <AutoApQRCode />
     </div>
   );
 }

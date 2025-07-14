@@ -56,6 +56,9 @@ enum Commands {
     Start {
         /// Interface name (e.g., wlan0)
         interface: String,
+        /// Port to run web server on
+        #[arg(short, long, default_value = "8080")]
+        port: u16,
     },
     /// Start web server for WiFi configuration
     WebServer {
@@ -203,10 +206,10 @@ async fn main() -> Result<()> {
                 std::process::exit(1);
             }
         }
-        Some(Commands::Start { interface }) => {
+        Some(Commands::Start { interface, port }) => {
             if is_installed {
                 let autoap = AutoAp::new().await?;
-                autoap.start(&interface).await?;
+                autoap.start(&interface, port).await?;
             } else {
                 error!("autoAP is not installed");
                 std::process::exit(1);

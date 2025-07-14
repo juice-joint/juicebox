@@ -18,7 +18,7 @@ use routes::admin::{
 use routes::karaoke::{current_song, play_next_song, queue_song, search, song_list};
 use routes::sse::sse;
 use routes::streaming::serve_dash_file;
-use routes::sys::server_ip;
+use routes::sys::{server_ip, autoap_status};
 use tower_http::cors::{Any, CorsLayer};
 use tower_http::trace::TraceLayer;
 use tracing::{error, info};
@@ -67,6 +67,7 @@ fn create_api_router() -> Router {
     Router::new()
         .route("/healthcheck", get(healthcheck))
         .route("/server_ip", get(server_ip))
+        .route("/autoap_status", get(autoap_status))
         .route("/queue_song", post(queue_song))
         .route("/play_next", post(play_next_song))
         .route("/song_list", get(song_list))

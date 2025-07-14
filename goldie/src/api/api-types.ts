@@ -18,3 +18,9 @@ export interface FormattedSong extends Song {
 export interface ServerIpResponse {
   ip: string;
 }
+
+export interface AutoApStatusResponse {
+  is_running: boolean;
+  is_installed: boolean;
+  web_server_port?: number;
+}

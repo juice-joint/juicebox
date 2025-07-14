@@ -3582,6 +3582,7 @@ dependencies = [
  "unidecode",
  "uuid",
  "which",
+ "wifi-handshake",
  "wry",
 ]
 

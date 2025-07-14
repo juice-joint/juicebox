@@ -37,8 +37,13 @@ impl AutoAp {
                 return Err(anyhow::anyhow!("Start command requires device name"));
             }
             let device = &args[2];
+            let port = if args.len() >= 4 {
+                args[3].parse::<u16>().unwrap_or(8080)
+            } else {
+                8080
+            };
             info!("Starting autoAP for device: {}", device);
-            self.start(device).await?;
+            self.start(device, port).await?;
             return Ok(());
         }
 
@@ -82,7 +87,7 @@ impl AutoAp {
         Ok(())
     }
 
-    pub async fn start(&self, device: &str) -> Result<()> {
+    pub async fn start(&self, device: &str, port: u16) -> Result<()> {
         self.reset().await?;
 
         let wpa_socket_path = format!("/var/run/wpa_supplicant/{}", device);
@@ -96,10 +101,10 @@ impl AutoAp {
         info!("wpa_supplicant online, starting monitor for {}", device);
         
         // Start web server in background
-        tokio::spawn(async {
-            info!("Starting WiFi configuration web server on port 8080");
+        tokio::spawn(async move {
+            info!("Starting WiFi configuration web server on port {}", port);
             let server = WebServer::new();
-            if let Err(e) = server.start(8080).await {
+            if let Err(e) = server.start(port).await {
                 error!("Failed to start web server: {}", e);
             }
         });

@@ -7,4 +7,5 @@ export const QUERY_KEYS = {
   playback: ["playback"] as const,
   restart: ["restart"] as const,
   queue: ["sse", EventType.QueueChangeEvent] as const,
+  autoApStatus: ["autoApStatus"] as const,
 };
