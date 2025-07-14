@@ -71,28 +71,107 @@ async fn serve_config_page() -> Html<String> {
 }
 
 async fn configure_wifi(Form(config): Form<WifiConfig>) -> Result<Html<&'static str>, StatusCode> {
+    // Add a small delay to show processing state
+    tokio::time::sleep(tokio::time::Duration::from_millis(1500)).await;
+    
     match WpaSupplicantManager::new().update_network(&config.ssid, &config.password) {
         Ok(()) => {
             info!("WiFi configuration updated for SSID: {}", config.ssid);
             Ok(Html(r#"
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>WiFi Configuration - Success</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1">
     <style>
-        body { font-family: Arial, sans-serif; max-width: 600px; margin: 50px auto; padding: 20px; }
-        .success { background: #d4edda; border: 1px solid #c3e6cb; color: #155724; padding: 15px; border-radius: 5px; margin: 20px 0; }
-        .button { background: #007bff; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; display: inline-block; margin: 10px 0; }
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 600px;
+            margin: 50px auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            text-align: center;
+        }
+        .success-icon {
+            font-size: 64px;
+            color: #28a745;
+            margin-bottom: 20px;
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 20px;
+        }
+        .success {
+            background: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+            text-align: left;
+        }
+        .button {
+            background: #007bff;
+            color: white;
+            padding: 12px 24px;
+            text-decoration: none;
+            border-radius: 5px;
+            display: inline-block;
+            margin: 20px 10px 0 10px;
+            font-size: 16px;
+            transition: background-color 0.3s;
+        }
+        .button:hover {
+            background: #0056b3;
+        }
+        .secondary-button {
+            background: #6c757d;
+        }
+        .secondary-button:hover {
+            background: #545b62;
+        }
+        .info {
+            background: #e1f5fe;
+            border: 1px solid #b3e5fc;
+            color: #01579b;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 20px 0;
+            text-align: left;
+        }
     </style>
 </head>
 <body>
-    <h1>WiFi Configuration Successful</h1>
-    <div class="success">
-        <strong>Success!</strong> WiFi network configuration has been updated.
-        <br>The system will attempt to connect to the configured network.
+    <div class="container">
+        <div class="success-icon">✅</div>
+        <h1>WiFi Configuration Successful!</h1>
+        
+        <div class="success">
+            <strong>Success!</strong> Your WiFi network has been configured successfully.
+            <br><br>
+            The system is now attempting to connect to the configured network. 
+            This process may take a few moments.
+        </div>
+        
+        <div class="info">
+            <strong>What happens next?</strong>
+            <ul style="margin: 10px 0;">
+                <li>The device will attempt to connect to your WiFi network</li>
+                <li>If successful, the access point mode will be disabled</li>
+                <li>You can monitor the connection status through your network settings</li>
+            </ul>
+        </div>
+        
+        <a href="/" class="button">Configure Another Network</a>
+        <a href="javascript:window.close()" class="button secondary-button">Close Window</a>
     </div>
-    <a href="/" class="button">Configure Another Network</a>
 </body>
 </html>
             "#))
