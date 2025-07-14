@@ -12,7 +12,6 @@ struct ServerIpResponse {
 #[derive(Serialize)]
 struct AutoApStatusResponse {
     is_running: bool,
-    is_installed: bool,
     web_server_port: Option<u16>,
 }
 
@@ -35,18 +34,13 @@ pub async fn server_ip() -> Result<impl IntoResponse, StatusCode> {
     ))
 }
 
-pub async fn autoap_status() -> Result<impl IntoResponse, StatusCode> {
-    let is_installed = wifi_handshake::utils::is_autoap_installed();
-    
+pub async fn autoap_status() -> Result<impl IntoResponse, StatusCode> {    
     // Check if autoap is running by looking for runtime indicators
-    let is_running = if is_installed {
+    let is_running =
         // Check for autoap runtime files (lock files, service status, etc.)
         Path::new("/var/run/autoAP.locked").exists() ||
         Path::new("/var/run/autoAP.unlock").exists() ||
-        is_autoap_service_active()
-    } else {
-        false
-    };
+        is_autoap_service_active();
 
     // Try to detect the web server port if autoap is running
     let web_server_port = if is_running {
@@ -55,13 +49,12 @@ pub async fn autoap_status() -> Result<impl IntoResponse, StatusCode> {
         None
     };
 
-    debug!("AutoAP status - installed: {}, running: {}, port: {:?}", is_installed, is_running, web_server_port);
+    debug!("AutoAP status - running: {}, port: {:?}", is_running, web_server_port);
 
     Ok((
         StatusCode::OK,
         Json(AutoApStatusResponse {
             is_running,
-            is_installed,
             web_server_port,
         }),
     ))
