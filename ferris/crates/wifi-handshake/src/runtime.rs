@@ -122,13 +122,23 @@ impl WpaEventHandler for AutoApHandler {
                 Self::configure_ap(&event.interface).await?;
                 
                 // Start web server for WiFi configuration
-                tokio::spawn(async move {
+                info!("Spawning web server task...");
+                let web_server_handle = tokio::spawn(async move {
                     info!("Starting WiFi configuration web server on port 8080");
                     let server = WebServer::new();
                     if let Err(e) = server.start(8080).await {
                         error!("Failed to start web server: {}", e);
+                    } else {
+                        info!("Web server started successfully");
                     }
                 });
+                
+                // Log if spawn succeeded
+                if web_server_handle.is_finished() {
+                    error!("Web server task finished immediately - check for errors");
+                } else {
+                    info!("Web server task spawned successfully");
+                }
                 
                 // Start reconfigure task in background
                 let device = event.interface.clone();
