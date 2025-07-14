@@ -236,10 +236,13 @@ impl AutoApHandler {
             .context("Failed to get wpa_cli status")?;
 
         if !output.status.success() {
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            info!("wpa_cli status failed - stderr: {}", stderr);
             return Ok(false);
         }
 
         let status = String::from_utf8_lossy(&output.stdout);
+        info!("wpa_cli status output: {}", status);
         
         // Look for actual client connection indicators
         let has_ssid = status.lines().any(|line| {
