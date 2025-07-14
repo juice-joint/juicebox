@@ -97,7 +97,7 @@ pub fn create_desktop_webview(
                     if first_load_url.compare_exchange(true, false, Ordering::SeqCst, Ordering::SeqCst).is_ok() {
                         info!("First LoadUrl detected, applying visibility workaround");
                         window.set_visible(false);
-                        std::thread::sleep(std::time::Duration::from_millis(100));
+                        std::thread::sleep(std::time::Duration::from_millis(1000));
                         window.set_visible(true);
                     }
                     
