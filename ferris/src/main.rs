@@ -92,7 +92,7 @@ async fn check_internet_connectivity() -> bool {
 
 async fn start_connectivity_monitoring(config_dir: PathBuf, ui_controller: UIStateController) {
     tokio::spawn(async move {
-        tokio::time::sleep(Duration::from_secs(10)).await;
+        tokio::time::sleep(Duration::from_secs(5)).await;
         info!("Starting connectivity monitoring");
         let mut was_connected = false;
         
