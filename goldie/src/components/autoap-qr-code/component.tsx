@@ -15,7 +15,7 @@ function AutoApQRCode() {
   const port = autoApStatus.web_server_port || 8080;
 
   return (
-    <div className="absolute bottom-4 right-4">
+    <div className="absolute bottom-4 left-4">
       <div className="bg-white p-3 rounded-lg shadow-xl flex flex-col items-center">
         <QRCode value={`http://${serverIp ?? ""}:${port}`} size={128} />
         <p className="text-gray-800 text-sm mt-2 font-medium">WiFi Setup</p>
