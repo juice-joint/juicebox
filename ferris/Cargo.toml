@@ -24,7 +24,6 @@ axum = { version = "0.8.1", features = ["macros"] }
 axum-embed = "0.1.0"
 axum-extra = { version = "0.10.0", features = ["typed-header"] }
 binary-sidecar = { path = "crates/binary-sidecar" }
-wifi-handshake = { path = "crates/wifi-handshake" }
 config = "0.15.8"
 dirs = "6.0.0"
 dotenv = "0.15.0"
