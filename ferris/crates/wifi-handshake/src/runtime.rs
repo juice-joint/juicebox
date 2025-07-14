@@ -253,56 +253,19 @@ impl AutoApHandler {
             line.starts_with("wpa_state=") && line.contains("COMPLETED")
         });
         
-        // Check if we have an IP address using ip command (works with systemd-resolved)
-        let has_ip_address = Self::check_device_has_ip(device).await.unwrap_or(false);
-        
         // Also check that we're not in AP mode by looking at the mode
         let not_in_ap_mode = !status.lines().any(|line| {
             line.contains("mode=AP") || line.contains("wpa_state=INTERFACE_DISABLED")
         });
         
         // We're only truly connected if we have an SSID, IP address, completed state, and not in AP mode
-        let is_connected = has_ssid && has_ip_address && wpa_state_completed && not_in_ap_mode;
+        let is_connected = has_ssid && wpa_state_completed && not_in_ap_mode;
         
         // Log all the individual checks so we can see which one is failing
-        info!("Connection check - SSID: {}, IP: {}, State: {}, Not AP: {}, Final Connected: {}", 
-               has_ssid, has_ip_address, wpa_state_completed, not_in_ap_mode, is_connected);
+        info!("Connection check - SSID: {}, State: {}, Not AP: {}, Final Connected: {}", 
+               has_ssid, wpa_state_completed, not_in_ap_mode, is_connected);
         
         Ok(is_connected)
-    }
-
-    async fn check_device_has_ip(device: &str) -> Result<bool> {
-        let output = tokio::process::Command::new("ip")
-            .args(["addr", "show", device])
-            .output()
-            .await
-            .context("Failed to get device IP address")?;
-
-        if !output.status.success() {
-            return Ok(false);
-        }
-
-        let ip_output = String::from_utf8_lossy(&output.stdout);
-        
-        // Look for inet addresses that aren't link-local (169.254.x.x) or loopback
-        let has_valid_ip = ip_output.lines().any(|line| {
-            if line.trim().starts_with("inet ") && !line.contains("127.0.0.1") {
-                // Extract the IP address part
-                if let Some(ip_part) = line.trim().split_whitespace().nth(1) {
-                    if let Some(ip) = ip_part.split('/').next() {
-                        // Skip link-local addresses (169.254.x.x)
-                        return !ip.starts_with("169.254.");
-                    }
-                }
-            }
-            false
-        });
-
-        if has_valid_ip {
-            debug!("Device {} has valid IP address", device);
-        }
-
-        Ok(has_valid_ip)
     }
 
     async fn configure_ap(device: &str) -> Result<()> {
