@@ -71,12 +71,25 @@ async fn serve_config_page() -> Html<String> {
 }
 
 async fn configure_wifi(Form(config): Form<WifiConfig>) -> Result<Html<&'static str>, StatusCode> {
-    // Add a small delay to show processing state
-    tokio::time::sleep(tokio::time::Duration::from_millis(1500)).await;
+    let manager = WpaSupplicantManager::new();
     
-    match WpaSupplicantManager::new().update_network(&config.ssid, &config.password) {
+    // Update config file but don't reload yet - so user can see success page
+    match manager.update_network_without_reload(&config.ssid, &config.password) {
         Ok(()) => {
             info!("WiFi configuration updated for SSID: {}", config.ssid);
+            
+            // Spawn background task to reload wpa_supplicant after delay
+            // This gives user time to see success page before AP disconnects
+            let ssid_clone = config.ssid.clone();
+            tokio::spawn(async move {
+                tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
+                if let Err(e) = manager.reload_wpa_supplicant_only() {
+                    error!("Failed to reload wpa_supplicant: {}", e);
+                } else {
+                    info!("wpa_supplicant reloaded for SSID: {}", ssid_clone);
+                }
+            });
+            
             Ok(Html(r#"
 <!DOCTYPE html>
 <html lang="en">

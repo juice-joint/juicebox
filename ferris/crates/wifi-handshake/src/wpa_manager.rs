@@ -30,6 +30,18 @@ impl WpaSupplicantManager {
         Ok(())
     }
 
+    pub fn update_network_without_reload(&self, ssid: &str, password: &str) -> Result<()> {
+        let content = self.read_config()?;
+        let updated_content = self.update_or_add_network(&content, ssid, password)?;
+        self.write_config(&updated_content)?;
+        // Don't reload here - caller will handle it
+        Ok(())
+    }
+
+    pub fn reload_wpa_supplicant_only(&self) -> Result<()> {
+        self.reload_wpa_supplicant()
+    }
+
     fn read_config(&self) -> Result<String> {
         fs::read_to_string(&self.config_path)
             .with_context(|| format!("Failed to read wpa_supplicant config from {}", self.config_path))
